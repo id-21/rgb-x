@@ -5,9 +5,12 @@ os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
 import gradio as gr
 import torch
 import torchvision
+import cv2
+import numpy as np
 from diffusers import DDIMScheduler
 from load_image import load_exr_image, load_ldr_image
 from pipeline_rgb2x import StableDiffusionAOVMatEstPipeline
+from PIL import Image
 
 current_directory = os.path.dirname(os.path.abspath(__file__))
 
@@ -24,6 +27,37 @@ def get_rgb2x_demo():
     )
     pipe.set_progress_bar_config(disable=True)
     pipe.to("cuda")
+
+    # Helper function to save AOV images
+    def save_aov_images(aov_dict, output_dir="/tmp/rgb2x_output"):
+        """Save AOV images as EXR and PNG for download"""
+        os.makedirs(output_dir, exist_ok=True)
+        saved_files = {}
+
+        for aov_name, image_tensor in aov_dict.items():
+            # Convert tensor to numpy
+            if isinstance(image_tensor, torch.Tensor):
+                img_np = image_tensor.cpu().numpy()
+                if img_np.ndim == 3 and img_np.shape[0] in [1, 3]:
+                    img_np = img_np.transpose(1, 2, 0)
+            else:
+                img_np = np.array(image_tensor)
+
+            # Save irradiance as EXR (linear color space for ST-RoomNet V3)
+            if aov_name == "irradiance":
+                exr_path = os.path.join(output_dir, "irradiance_shadow.exr")
+                # Reverse gamma correction to get linear RGB: linear = gamma^2.2
+                img_linear = img_np ** 2.2
+                cv2.imwrite(exr_path, cv2.cvtColor(img_linear.astype(np.float32), cv2.COLOR_RGB2BGR))
+                saved_files["shadow_exr"] = exr_path
+
+                # Also save PNG preview (gamma-corrected for visual verification)
+                png_path = os.path.join(output_dir, "irradiance_preview.png")
+                img_png = (img_np * 255).astype(np.uint8)
+                cv2.imwrite(png_path, cv2.cvtColor(img_png, cv2.COLOR_RGB2BGR))
+                saved_files["shadow_png"] = png_path
+
+        return saved_files
 
     # Augmentation
     def callback(
@@ -73,6 +107,8 @@ def get_rgb2x_demo():
         }
 
         return_list = []
+        aov_images = {}  # Store AOV images for download
+
         for i in range(num_samples):
             for aov_name in required_aovs:
                 prompt = prompts[aov_name]
@@ -90,10 +126,21 @@ def get_rgb2x_demo():
                     (old_height, old_width)
                 )(generated_image)
 
-                generated_image = (generated_image, f"Generated {aov_name} {i}")
-                return_list.append(generated_image)
+                # Store first sample for download
+                if i == 0:
+                    aov_images[aov_name] = generated_image
 
-        return return_list
+                return_list.append((generated_image, f"Generated {aov_name} {i}"))
+
+        # Save images and get file paths
+        saved_files = save_aov_images(aov_images)
+
+        # Return: gallery, irradiance PNG preview, irradiance EXR for ST-RoomNet
+        return (
+            return_list,
+            saved_files.get("shadow_png"),
+            saved_files.get("shadow_exr"),
+        )
 
     block = gr.Blocks()
     with block:
@@ -140,13 +187,18 @@ def get_rgb2x_demo():
                     columns=2,
                 )
 
+                gr.Markdown("### 📥 Download Shadow Data for ST-RoomNet V3")
+                shadow_preview = gr.File(label="Irradiance Preview (PNG)")
+                shadow_download = gr.File(label="Shadow Layer (EXR - Use this in ST-RoomNet)")
+
         inputs = [
             photo,
             seed,
             inference_step,
             num_samples,
         ]
-        run_button.click(fn=callback, inputs=inputs, outputs=result_gallery, queue=True)
+        outputs = [result_gallery, shadow_preview, shadow_download]
+        run_button.click(fn=callback, inputs=inputs, outputs=outputs, queue=True)
 
     return block
 
