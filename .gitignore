@@ -3,3 +3,4 @@ rgb-x_output/
 __pycache__/
 *.pyc
 model_cache*/
+normal_irradiance/example/
