@@ -30,32 +30,44 @@ def get_rgb2x_demo():
 
     # Helper function to save AOV images
     def save_aov_images(aov_dict, output_dir="/tmp/rgb2x_output"):
-        """Save AOV images as EXR and PNG for download"""
+        """Save AOV images as NPY/EXR and PNG for download
+
+        Args:
+            aov_dict: Dictionary of {aov_name: numpy_array} where numpy_array is (H, W, C) float32
+        """
         os.makedirs(output_dir, exist_ok=True)
         saved_files = {}
 
-        for aov_name, image_tensor in aov_dict.items():
-            # Convert tensor to numpy
-            if isinstance(image_tensor, torch.Tensor):
-                img_np = image_tensor.cpu().numpy()
-                if img_np.ndim == 3 and img_np.shape[0] in [1, 3]:
-                    img_np = img_np.transpose(1, 2, 0)
-            else:
-                img_np = np.array(image_tensor)
+        for aov_name, img_np in aov_dict.items():
+            # img_np is already a numpy array in (H, W, C) format from pipeline output_type="np"
+
+            # Save normal maps as NPY and PNG
+            if aov_name == "normal":
+                # Save as .npy file (raw numpy array in linear space)
+                npy_path = os.path.join(output_dir, "normal_map.npy")
+                np.save(npy_path, img_np.astype(np.float32))
+                saved_files["normal_npy"] = npy_path
+
+                # Save PNG preview (already in display-ready format)
+                png_path = os.path.join(output_dir, "normal_map.png")
+                img_png = (np.clip(img_np, 0, 1) * 255).astype(np.uint8)
+                cv2.imwrite(png_path, cv2.cvtColor(img_png, cv2.COLOR_RGB2BGR))
+                saved_files["normal_png"] = png_path
 
             # Save irradiance as EXR (linear color space for ST-RoomNet V3)
-            if aov_name == "irradiance":
-                exr_path = os.path.join(output_dir, "irradiance_shadow.exr")
+            elif aov_name == "irradiance":
                 # INVERT: Model outputs bright=shadow, we need bright=light
-                img_np = 1.0 - img_np
+                img_inverted = 1.0 - img_np
+
                 # Reverse gamma correction to get linear RGB: linear = gamma^2.2
-                img_linear = img_np ** 2.2
+                img_linear = img_inverted ** 2.2
+                exr_path = os.path.join(output_dir, "irradiance_shadow.exr")
                 cv2.imwrite(exr_path, cv2.cvtColor(img_linear.astype(np.float32), cv2.COLOR_RGB2BGR))
                 saved_files["shadow_exr"] = exr_path
 
                 # Also save PNG preview (gamma-corrected for visual verification)
                 png_path = os.path.join(output_dir, "irradiance_preview.png")
-                img_png = (img_np * 255).astype(np.uint8)
+                img_png = (img_inverted * 255).astype(np.uint8)
                 cv2.imwrite(png_path, cv2.cvtColor(img_png, cv2.COLOR_RGB2BGR))
                 saved_files["shadow_png"] = png_path
 
@@ -111,7 +123,8 @@ def get_rgb2x_demo():
         for i in range(num_samples):
             for aov_name in required_aovs:
                 prompt = prompts[aov_name]
-                generated_image = pipe(
+                # Get numpy array directly from pipeline
+                generated_image_np = pipe(
                     prompt=prompt,
                     photo=photo,
                     num_inference_steps=inference_step,
@@ -119,30 +132,28 @@ def get_rgb2x_demo():
                     width=new_width,
                     generator=generator,
                     required_aovs=[aov_name],
-                ).images[0][0]
+                    output_type="np",  # Get numpy arrays directly
+                ).images[0]
 
-                generated_image = torchvision.transforms.Resize(
-                    (old_height, old_width)
-                )(generated_image)
+                # Resize numpy array using cv2
+                generated_image_np = cv2.resize(
+                    generated_image_np,
+                    (old_width, old_height),
+                    interpolation=cv2.INTER_LINEAR
+                )
 
-                # Store first sample for download
+                # Store first sample for download (numpy format)
                 if i == 0:
-                    aov_images[aov_name] = generated_image
+                    aov_images[aov_name] = generated_image_np
 
-                return_list.append((generated_image, f"Generated {aov_name} {i}"))
+                # Convert to tensor for Gradio gallery display (C, H, W)
+                display_tensor = torch.from_numpy(generated_image_np.transpose(2, 0, 1))
+                return_list.append((display_tensor, f"Generated {aov_name} {i}"))
 
         # Create white wall × shadow visualization
         if "irradiance" in aov_images:
-            # Get irradiance and invert it (model outputs bright=shadow, we need bright=light)
-            irradiance = aov_images["irradiance"]
-
-            # Convert to numpy for processing
-            if isinstance(irradiance, torch.Tensor):
-                shadow_np = irradiance.cpu().numpy()
-                if shadow_np.ndim == 3 and shadow_np.shape[0] in [1, 3]:
-                    shadow_np = shadow_np.transpose(1, 2, 0)
-            else:
-                shadow_np = np.array(irradiance)
+            # Get irradiance numpy array (already in (H, W, C) format)
+            shadow_np = aov_images["irradiance"]
 
             # Invert: bright areas become lit, dark areas become shadowed
             shadow_inverted = 1.0 - shadow_np
@@ -153,7 +164,7 @@ def get_rgb2x_demo():
             # Multiply: white × shadow = shaded white surface (in gamma space for quick preview)
             shaded_white = white_surface * shadow_inverted
 
-            # Convert back to tensor for display
+            # Convert to tensor for display (C, H, W)
             shaded_white_tensor = torch.from_numpy(shaded_white.transpose(2, 0, 1))
 
             # Add to gallery with descriptive label
@@ -162,9 +173,11 @@ def get_rgb2x_demo():
         # Save images and get file paths
         saved_files = save_aov_images(aov_images)
 
-        # Return: gallery, irradiance PNG preview, irradiance EXR for ST-RoomNet
+        # Return: gallery, normal NPY, normal PNG, irradiance PNG preview, irradiance EXR for ST-RoomNet
         return (
             return_list,
+            saved_files.get("normal_npy"),
+            saved_files.get("normal_png"),
             saved_files.get("shadow_png"),
             saved_files.get("shadow_exr"),
         )
@@ -214,7 +227,11 @@ def get_rgb2x_demo():
                     columns=3,
                 )
 
-                gr.Markdown("### 📥 Normal + Shadow Output")
+                gr.Markdown("### 📥 Normal Map Downloads")
+                normal_npy_download = gr.File(label="Normal Map (NPY - NumPy array)")
+                normal_png_download = gr.File(label="Normal Map Preview (PNG)")
+
+                gr.Markdown("### 📥 Shadow Layer Downloads")
                 shadow_preview = gr.File(label="Irradiance Preview (PNG)")
                 shadow_download = gr.File(label="Shadow Layer (EXR - Use this in ST-RoomNet)")
 
@@ -224,7 +241,7 @@ def get_rgb2x_demo():
             inference_step,
             num_samples,
         ]
-        outputs = [result_gallery, shadow_preview, shadow_download]
+        outputs = [result_gallery, normal_npy_download, normal_png_download, shadow_preview, shadow_download]
         run_button.click(fn=callback, inputs=inputs, outputs=outputs, queue=True)
 
     return block
