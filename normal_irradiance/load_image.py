@@ -80,17 +80,17 @@ def convert_Yxy_2_rgb(Yxy):
 
 def load_ldr_image(image_path, from_srgb=False, clamp=False, normalize=False):
     # Load png or jpg image
-    # Try OpenCV first                                                                                                                                  │
-    img = cv2.imread(image_path)                                                                                                                        │
-    if img is None:                                                                                                                                     │
-        # Fallback to PIL for problematic JPEGs                                                                                                         │
-        from PIL import Image as PILImage                                                                                                               │
-        img = PILImage.open(image_path).convert('RGB')                                                                                                  │
-        img = np.array(img)                                                                                                                             │
-        # PIL returns RGB, OpenCV expects BGR for cvtColor                                                                                              │
-        image = img  # Already RGB from PIL                                                                                                             │
-    else:                                                                                                                                               │
-        # OpenCV returns BGR, convert to RGB                                                                                                            │
+    # Try OpenCV first                                                                                                                                  
+    img = cv2.imread(image_path)                                                                                                                        
+    if img is None:                                                                                                                                     
+        # Fallback to PIL for problematic JPEGs                                                                                                         
+        from PIL import Image as PILImage                                                                                                               
+        img = PILImage.open(image_path).convert('RGB')                                                                                                  
+        img = np.array(img)                                                                                                                             
+        # PIL returns RGB, OpenCV expects BGR for cvtColor                                                                                              
+        image = img  # Already RGB from PIL                                                                                                             
+    else:                                                                                                                                               
+        # OpenCV returns BGR, convert to RGB                                                                                                            
         image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)     
     image = torch.from_numpy(image.astype(np.float32) / 255.0)  # (h, w, c)
     image[~torch.isfinite(image)] = 0
