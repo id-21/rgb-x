@@ -46,6 +46,8 @@ def get_rgb2x_demo():
             # Save irradiance as EXR (linear color space for ST-RoomNet V3)
             if aov_name == "irradiance":
                 exr_path = os.path.join(output_dir, "irradiance_shadow.exr")
+                # INVERT: Model outputs bright=shadow, we need bright=light
+                img_np = 1.0 - img_np
                 # Reverse gamma correction to get linear RGB: linear = gamma^2.2
                 img_linear = img_np ** 2.2
                 cv2.imwrite(exr_path, cv2.cvtColor(img_linear.astype(np.float32), cv2.COLOR_RGB2BGR))
@@ -129,6 +131,34 @@ def get_rgb2x_demo():
 
                 return_list.append((generated_image, f"Generated {aov_name} {i}"))
 
+        # Create white wall × shadow visualization
+        if "irradiance" in aov_images:
+            # Get irradiance and invert it (model outputs bright=shadow, we need bright=light)
+            irradiance = aov_images["irradiance"]
+
+            # Convert to numpy for processing
+            if isinstance(irradiance, torch.Tensor):
+                shadow_np = irradiance.cpu().numpy()
+                if shadow_np.ndim == 3 and shadow_np.shape[0] in [1, 3]:
+                    shadow_np = shadow_np.transpose(1, 2, 0)
+            else:
+                shadow_np = np.array(irradiance)
+
+            # Invert: bright areas become lit, dark areas become shadowed
+            shadow_inverted = 1.0 - shadow_np
+
+            # Create white surface (same dimensions as shadow)
+            white_surface = np.ones_like(shadow_inverted)
+
+            # Multiply: white × shadow = shaded white surface (in gamma space for quick preview)
+            shaded_white = white_surface * shadow_inverted
+
+            # Convert back to tensor for display
+            shaded_white_tensor = torch.from_numpy(shaded_white.transpose(2, 0, 1))
+
+            # Add to gallery with descriptive label
+            return_list.append((shaded_white_tensor, "White Wall × Shadow (Debug Visualization)"))
+
         # Save images and get file paths
         saved_files = save_aov_images(aov_images)
 
@@ -181,7 +211,7 @@ def get_rgb2x_demo():
                     label="Output",
                     show_label=False,
                     elem_id="gallery",
-                    columns=2,
+                    columns=3,
                 )
 
                 gr.Markdown("### 📥 Normal + Shadow Output")
