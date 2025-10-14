@@ -1,0 +1,51 @@
+I made the edit of accessing via '[0][0]' instead of '[0]'.
+But this file @rgb-x/normal_irradiance/gradio_demo_normal_irradiance.py is a new script that we have made. 
+I think there will be errors that need fixing to work. 
+Since this script can't be run locally as mentioned in @rgb-x/implementation.md,
+we need a better strategy to make this robust. We need to create such a notebook for Google Colab, 
+I want to move to a new system of testing. Instead of just running the Gradio file on Colab, 
+I want to run this file in the same notebook to load the scripts and then run the gradio file 
+so that I can see end to end what the error is and where it is originating, 
+how to debug it with console.log messages and once everything works perfectly, 
+we can make the colab notebook into a module type system again. 
+
+Let me describe the problem I am facing right now. I am testing a
+RGB->X model to help us in visualising wallpapers in RGB photos of rooms. 
+This requires segmenting walls from the image, identifying their plane or 
+orientation with respect to the camera, creating a layer of wallpaper pattern
+that would fit the wall while respecting the repeat and size of the wallpaper,
+transform the layer to match the walls perspective and overlay it on the image. 
+Next, we need to find the shadows on the walls by the various other elements
+of the room, note it as a shadown layer that could be in the range of 0 to 1,
+and then change the brightness or look of the wallpaper pattern to respect this
+lighting in the room. But using a multiply operation on the matrices, we can
+get this new perspective and apply it over the layer for realism. 
+
+The RGB->X model can help in a few tasks. The model takes an image and using 
+Stable Diffusion Model architechture, outputs 5 images: albedo, normal, 
+irradiance, metallicity and roughness. For us, normal and irradiance output
+are the only relevant outputs: using normal, we can find out the orientation
+of the surface of a pixel with respect to the camera and with irradiance, we 
+can know the relative light in that pixel. 
+
+With these outputs, we need to run tests and figure out how to integrate the 
+model for our use case. This would require the first step of running the model
+and saving the raw output data from some sample images. Now we have a 
+GitHub repo by the authors of the model that runs perfectly and we need 
+modify the scripts to allow us to get these initial outputs first. 
+
+The problem however is that the modules of the repo are in script format.
+The model needs NVIDIA GPUs and CUDA to run and I cant do so locally. 
+So we need to run this in a Google Colab Jupyter notebook. We can start by
+taking the model's scripts as a module but in the repo, they use a python
+script to make the Gradio API front end. WE NEED TO DO THAT IN A JUPYTER
+NOTEBOOK BECAUSE WE WILL EDIT THE FRONT END TO SUIT OUR NEEDS AND DEBUG OUR
+CODE WHICH IS VERY DIFFICULT WHEN WE USE SCRIPTS FOR THAT. 
+
+SO THIS IS THE GOAL. ASK ME FOR FILE REFERENCES AND LET'S DO THIS.
+
+
+
+_______________________________
+ABOUT READING: 
+Okay, you can read @rgb-x/rgbx/rgb2x/pipeline_rgb2x.py and @rgb-x/rgbx/rgb2x/load_image.py but don't read @rgb-x/normal_irradiance/gradio_demo_normal_irradiance.py . Instead read @rgb-x/rgbx/rgb2x/gradio_demo_rgb2x.py because in the gradio script we made, there are some mistakes. A few things to look for: 1. in @rgb-x/rgbx/rgb2x/pipeline_rgb2x.py , I remember them using just PyTorch or TorchVision to load the images. That failed for maybe jpg files or jpeg files that had some discrepancy. The Torch way of reading images is maybe too strict so we implemented a PIL based reading method for the images for more robust reading. This may require us to make a new module with this small change and we can do that but if that isn't an issue, its best. 

@@ -8,198 +8,143 @@
 
 ## Executive Summary
 
-User requires a Jupyter notebook for Google Colab that loads the RGB→X model inline (not as modules) and runs a custom Gradio interface for debugging. The notebook must extract normal maps and irradiance data from room photos for wallpaper visualization, with full visibility into the pipeline execution for debugging. This replaces the current approach of running standalone Python scripts which are difficult to debug remotely.
+Create a Jupyter notebook for Google Colab that imports RGB→X model as modules but defines the Gradio interface inline for easy debugging. User can modify and re-run Gradio cells without reloading the model. Extracts normal maps and irradiance data for wallpaper visualization.
 
 ---
 
 ## CLAUDE.md Analysis
 
 **Files Read:**
-- `implementation.md` - Environment constraints: Python 3.9 venv required, MPLBACKEND must be cleared
-- `rgbx/rgb2x/CLAUDE.md` - Model architecture: pipeline initialization, image loading, dual guidance patterns
-- `normal_irradiance/CLAUDE.md` - Output format requirements: numpy arrays, gamma correction rules, EXR export format
+- `implementation.md` - Python 3.9 venv setup, MPLBACKEND clearing
+- `rgbx/rgb2x/CLAUDE.md` - Pipeline initialization, DDIM scheduler config
+- `normal_irradiance/CLAUDE.md` - NumPy output format, gamma correction per AOV type
 
-**Relevant Patterns Identified:**
-- **Python 3.9 venv pattern** from `implementation.md` - Required to avoid JAX compatibility issues
-- **Pipeline initialization pattern** from `rgbx/rgb2x/CLAUDE.md:79-84` - Load from HuggingFace with DDIM scheduler
-- **NumPy-first workflow** from `normal_irradiance/CLAUDE.md:81-104` - Use `output_type="np"` for direct array access
-- **Linear vs sRGB handling** from `normal_irradiance/CLAUDE.md:106-118` - Gamma correction applied per AOV type
-
-**Existing Code to Reference:**
-- Model initialization: Documented in `rgbx/rgb2x/CLAUDE.md` (section: PAVED PATH)
-- Image loading utilities: Documented in `rgbx/rgb2x/CLAUDE.md` (section: Input Processing)
-- Output format handling: Documented in `normal_irradiance/CLAUDE.md` (section: Pipeline Output Format)
+**Key Patterns:**
+- Python 3.9 venv required (JAX compatibility with diffusers 0.20.0)
+- Import model as modules, define Gradio callback in notebook cells
+- Use `output_type="np"` for direct numpy array access
+- PIL fallback for JPEG loading already implemented in `load_image.py:83-94`
 
 ---
 
 ## Goal Statement
 
 **Objective:**
-Create a Jupyter notebook that runs on Google Colab, loads the RGB→X model components inline, and provides a debuggable Gradio interface for extracting normal maps and irradiance data from room photos.
+Import RGB→X pipeline as modules, but define Gradio interface in editable notebook cells for rapid iteration and debugging.
 
-**Current State:**
-- Standalone Gradio script exists at `normal_irradiance/gradio_demo_normal_irradiance.py`
-- Script runs successfully in Python 3.9 venv on Colab but debugging is difficult
-- Cannot see intermediate outputs or add print statements easily
-- Model requires NVIDIA GPU (can't run locally on Mac M4)
+**Current Problem:**
+Standalone script `normal_irradiance/gradio_demo_normal_irradiance.py` requires full restart to test changes. Cannot add print statements or inspect intermediate results easily.
 
-**Integration Points:**
-- **Environment setup** (documented in `implementation.md:76-130`)
-  - Python 3.9 virtual environment
-  - Clear `MPLBACKEND` environment variable
-  - Install dependencies matching `rgbx/environment.yml`
-
-- **Model components** (documented in `rgbx/rgb2x/CLAUDE.md`)
-  - StableDiffusionAOVMatEstPipeline for inference
-  - DDIMScheduler with specific configuration
-  - Image loading utilities for preprocessing
-
-- **Output requirements** (documented in `normal_irradiance/CLAUDE.md:16-59`)
-  - Normal maps: numpy arrays in linear space
-  - Irradiance: EXR files in linear RGB for ST-RoomNet V3 integration
-
-**Dependencies:**
-- **Core model files** (from `rgbx/rgb2x/CLAUDE.md:5-10`)
-  - `pipeline_rgb2x.py` or `pipeline_normal_irradiance.py` - Custom Stable Diffusion pipeline
-  - `load_image.py` - Image preprocessing with color space conversions
-
-- **HuggingFace model weights** (from `rgbx/rgb2x/CLAUDE.md:72`)
-  - Model ID: `zheng95z/rgb-to-x`
-  - Cached to isolated directory to prevent conflicts
+**Solution:**
+Notebook with separate cells for:
+1. Model import (run once)
+2. Model initialization (run once, slow)
+3. Gradio callback definition (edit and re-run quickly)
+4. Gradio interface creation (edit and re-run)
+5. Launch (restart without reloading model)
 
 ---
 
-## Current Workflow Issues
+## Notebook Structure
 
-**Problem:**
-Running standalone Python scripts on Colab prevents effective debugging because:
-1. Can't see intermediate outputs between steps
-2. Can't add print/console.log statements easily
-3. Errors provide limited context about where they originate
-4. Must re-run entire script to test small changes
-
-**Why This Approach Was Used:**
-- Original repo by model authors uses standalone Gradio scripts
-- Works well for local development with direct terminal access
-- Assumption: Users have NVIDIA GPU locally (not true for Mac users)
-
-**Why The Assumption Is Wrong:**
-- Mac M4 has MPS (Metal Performance Shaders), not CUDA
-- Google Colab is only option for GPU access
-- Colab environment is designed for notebooks, not standalone scripts
-
----
-
-## Notebook Requirements
-
-### Section 1: Environment Setup
-**Purpose:** Create isolated Python 3.9 environment and clear conflicting variables
-
-**Requirements from `implementation.md:76-105`:**
-- Install Python 3.9 in Colab
-- Create venv at `/content/py39env`
-- Install PyTorch 2.3.0 with CUDA 12.1
-- Install diffusers 0.20.0, gradio 3.48.0, and supporting libraries
+### Cell Block 1: Environment Setup
+- Install Python 3.9 in Colab: `apt-get install python3.9 python3.9-venv`
+- Create venv: `python3.9 -m venv /content/py39env`
+- Install dependencies: PyTorch 2.3.0+cu121, diffusers 0.20.0, gradio 3.48.0
 - Clear `MPLBACKEND` environment variable
 
-### Section 2: Model Component Loading
-**Purpose:** Load pipeline, scheduler, and helper functions inline for visibility
+### Cell Block 2: Clone & Import Model (Run Once)
+- Clone/install model repo
+- Import as modules:
+  ```python
+  from pipeline_normal_irradiance import StableDiffusionAOVMatEstPipeline
+  from load_image import load_ldr_image, load_exr_image
+  ```
 
-**Requirements from `rgbx/rgb2x/CLAUDE.md:76-84`:**
-- Import StableDiffusionAOVMatEstPipeline class definition
-- Import image loading utilities (load_ldr_image, load_exr_image)
-- Import color space conversion functions
-- Load model from `zheng95z/rgb-to-x` with torch.float16
-- Configure DDIMScheduler with `rescale_betas_zero_snr=True`
+### Cell Block 3: Initialize Pipeline (Run Once, Slow)
+- Load from HuggingFace: `StableDiffusionAOVMatEstPipeline.from_pretrained("zheng95z/rgb-to-x")`
+- Configure DDIM scheduler with `rescale_betas_zero_snr=True`
+- Move to GPU: `.to("cuda")`
 
-### Section 3: Custom Gradio Interface
-**Purpose:** Create debuggable interface for normal + irradiance extraction
+### Cell Block 4: Define Gradio Callback (Editable, Re-runnable)
+- Define `callback(photo, seed, inference_step, num_samples)` function
+- Add print statements for debugging (image shapes, data types, processing time)
+- Call pipeline with `output_type="np"` for numpy arrays
+- **Return 5 downloadable files:**
+  1. **Normal - NumPy**: `normal_map.npy` - Raw float32 array in linear space
+  2. **Normal - Visualization**: `normal_map.png` or `.jpg` - RGB image for visual inspection
+  3. **Irradiance - NumPy**: `irradiance.npy` - Raw float32 array (gamma-corrected)
+  4. **Irradiance - EXR**: `irradiance_shadow.exr` - Linear RGB (gamma reversed) for ST-RoomNet V3
+  5. **Irradiance - Visualization**: `irradiance_preview.jpg` - RGB image for visual inspection
 
-**Requirements from `normal_irradiance/CLAUDE.md:42-76`:**
-- Accept image uploads (.png, .jpg, .exr)
-- Resize to max 1000px, ensure dimensions divisible by 8
-- Run inference with prompts: "Camera-space Normal", "Irradiance (diffuse lighting)"
-- Use `output_type="np"` for direct numpy array access
-- Export normal maps as .npy and .png
-- Export irradiance as linear RGB .exr for ST-RoomNet V3
-- Invert irradiance (model outputs bright=shadow, need bright=light)
-- Reverse gamma correction before saving EXR: `linear = gamma^2.2`
+### Cell Block 5: Create Gradio Interface (Editable, Re-runnable)
+- Define `gr.Blocks()` interface
+- Connect callback to button clicks
+- Configure file uploads (.png, .jpg, .exr)
 
-### Section 4: Debugging & Testing
-**Purpose:** Add extensive logging and intermediate output visibility
-
-**Requirements:**
-- Print statements showing:
-  - Image dimensions at each step
-  - Data types and value ranges
-  - Processing time per AOV
-- Display intermediate results in notebook cells
-- Ability to inspect numpy arrays directly
-- Error messages with full stack traces
+### Cell Block 6: Launch (Restartable)
+- `demo.launch(share=True)` for public Colab URL
+- Can close and relaunch without reloading model
 
 ---
 
-## Critical Notes
+## Critical Implementation Notes
 
-**From `implementation.md:1-17`:**
-- MUST use Python 3.9 (Colab defaults to 3.12, causes JAX errors)
-- MUST clear `MPLBACKEND` environment variable (Colab-specific conflict)
-- Cannot run locally on Mac M4 (requires NVIDIA GPU with CUDA)
+**Environment (from `implementation.md`):**
+- Python 3.9 required (Colab defaults to 3.12, causes JAX AttributeError)
+- Must clear `MPLBACKEND` before running
 
-**From `rgbx/rgb2x/CLAUDE.md:68-74`:**
-- Gamma correction toggle: albedo/irradiance require gamma 2.2→sRGB, but normal maps are linear
-- Shadow layer format: ST-RoomNet V3 requires LINEAR RGB in EXR format
-- Dimension constraints: images MUST have width/height divisible by 8 (VAE downsampling)
-- Prompt engineering: AOV quality depends on exact prompt phrasing, do not modify
+**Image Processing (follow original gradio_demo_rgb2x.py:80-98):**
+- Resize to max 1000px while maintaining aspect ratio
+- Round dimensions to nearest multiple of 8 (VAE downsampling constraint)
+- Use `torchvision.transforms.Resize()` for tensor resizing
+- `load_image.py` already has PIL fallback for problematic JPEGs (lines 83-94)
 
-**Image Loading Robustness (CRITICAL):**
-- OpenCV's `cv2.imread()` fails on some JPEG files (too strict error handling)
-- Fixed implementation uses PIL fallback: Try OpenCV first, if returns None, use `PIL.Image.open().convert('RGB')`
-- This fix is ALREADY implemented in both `rgbx/rgb2x/load_image.py:83-94` and `normal_irradiance/load_image.py:83-94`
-- Notebook should use the existing `load_image.py` files as-is (no modification needed)
+**Output Format (from `normal_irradiance/CLAUDE.md:16-59`):**
+- Pipeline with `output_type="np"` returns numpy arrays shaped `(H, W, C)` in [0, 1] range
+- Access with `.images[0][0]` when `required_aovs` has one item
+- **Normal outputs:**
+  - `.npy`: Raw numpy array (H, W, 3) float32, linear space (no gamma correction)
+  - Visualization: Convert to 8-bit PNG/JPG for visual inspection
+- **Irradiance outputs:**
+  - `.npy`: Raw numpy array (H, W, 3) float32, gamma-corrected (display-ready)
+  - `.exr`: Linear RGB (reverse gamma: `linear = gamma^2.2`) for ST-RoomNet V3
+  - Visualization: 8-bit JPG (gamma-corrected) for visual inspection
 
-**From `normal_irradiance/CLAUDE.md:122-143`:**
-- Normal maps stay in linear space (RGB represents XYZ surface directions)
-- Irradiance is gamma-corrected for display, must reverse before EXR export
-- Linear RGB requirement: shadow multiplication must happen in linear space to avoid color shifts
-- Model uses same weights as full rgb2x, isolated cache prevents conflicts
-
----
-
-## Next Steps
-
-**Notebook Creation** (create `colab-notebook-debug.ipynb`):
-- Implement 4 sections: setup, model loading, Gradio interface, testing
-- Keep all code inline (no external script imports)
-- Add extensive print statements for debugging
-- Test with sample images from `normal_irradiance/sample_images/`
+**Prompts (frozen, do not modify):**
+- Normal: "Camera-space Normal"
+- Irradiance: "Irradiance (diffuse lighting)"
 
 ---
 
-## Open Questions
+## Benefits of This Approach
 
-- [ ] Should we include the white wall × shadow visualization from existing Gradio script?
-- [ ] What sample images are available for testing?
-- [ ] Should notebook auto-download sample images or require upload?
+**vs. Standalone Script:**
+- Model stays loaded between Gradio interface changes
+- Add/modify print statements without full restart
+- Test callback function pieces in separate cells
+- See intermediate results directly in notebook
+
+**vs. Copying Code Inline:**
+- Model code stays as importable modules (no code duplication)
+- Easier to update if model repo changes
+- Only Gradio interface definition lives in notebook
 
 ---
 
 ## References
 
 **CLAUDE.md Files:**
-- `implementation.md` - Sections: Platform Incompatibility, Final Working Solution (Python 3.9 venv)
-- `rgbx/rgb2x/CLAUDE.md` - Sections: Pipeline Architecture, Gradio Demo, PAVED PATH
-- `normal_irradiance/CLAUDE.md` - Sections: Pipeline Output Format, Shadow Export, CRITICAL NOTES
+- `implementation.md` - Python 3.9 venv setup
+- `rgbx/rgb2x/CLAUDE.md` - Pipeline initialization pattern
+- `normal_irradiance/CLAUDE.md` - Output format, gamma correction rules
 
-**Documentation Files:**
-- `make_gradio_ipynb.txt` - User requirements and problem statement
-- `rgbx/environment.yml` - Dependency specifications
-
-**Related Research:**
-- `normal_irradiance/CLAUDE.md` references `research/understanding-shadow.md` for shadow processing strategy
+**Model Files (import as modules):**
+- `pipeline_normal_irradiance.py` - Custom Stable Diffusion pipeline
+- `load_image.py` - Image loading with PIL fallback
 
 ---
 
 ## Conclusion
 
-The notebook must provide full visibility into the RGB→X pipeline execution by loading model components inline and adding extensive debugging outputs. This requires Python 3.9 venv setup, clearing Colab-specific environment conflicts, and implementing a custom Gradio interface that exposes numpy arrays at each step. Success depends on maintaining exact dependency versions and respecting the model's gamma correction requirements for different AOV types.
+Notebook imports model as modules but defines Gradio interface in editable cells. This enables rapid iteration (change callback → re-run cell) without slow model reloading, while maintaining model code as reusable modules.

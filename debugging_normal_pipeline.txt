@@ -1,0 +1,547 @@
+> I ran into this error after the pipeline loaded in 
+'/Users/ishan-aiworkspace/Documents/apps/rgb-x/normal_irradiance/gradio_demo_normal_irradiance.py': "Loading
+ pipeline components...: 100% 5/5 [00:23<00:00,  4.72s/it]
+IMPORTANT: You are using gradio version 3.48.0, however version 4.44.1 is available, please upgrade.
+--------
+Running on local URL:  http://127.0.0.1:7860
+Running on public URL: https://d7833e46bc6b6b8340.gradio.live
+
+This share link expires in 72 hours. For free permanent hosting and GPU upgrades, run `gradio deploy` from 
+Terminal to deploy to Spaces (https://huggingface.co/spaces)
+/content/py39env/lib/python3.9/site-packages/torch/nn/modules/conv.py:456: UserWarning: Plan failed with a 
+cudnnException: CUDNN_BACKEND_EXECUTION_PLAN_DESCRIPTOR: cudnnFinalize Descriptor Failed cudnn_status: 
+CUDNN_STATUS_NOT_SUPPORTED (Triggered internally at ../aten/src/ATen/native/cudnn/Conv_v8.cpp:919.)
+  return F.conv2d(input, weight, bias, self.stride,
+Traceback (most recent call last):
+  File "/content/py39env/lib/python3.9/site-packages/gradio/queueing.py", line 407, in call_prediction
+    output = await route_utils.call_process_api(
+  File "/content/py39env/lib/python3.9/site-packages/gradio/route_utils.py", line 226, in call_process_api
+    output = await app.get_blocks().process_api(
+  File "/content/py39env/lib/python3.9/site-packages/gradio/blocks.py", line 1550, in process_api
+    result = await self.call_function(
+  File "/content/py39env/lib/python3.9/site-packages/gradio/blocks.py", line 1185, in call_function
+    prediction = await anyio.to_thread.run_sync(
+  File "/content/py39env/lib/python3.9/site-packages/anyio/to_thread.py", line 56, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+  File "/content/py39env/lib/python3.9/site-packages/anyio/_backends/_asyncio.py", line 2485, in 
+run_sync_in_worker_thread
+    return await future
+  File "/content/py39env/lib/python3.9/site-packages/anyio/_backends/_asyncio.py", line 976, in run
+    result = context.run(func, *args)
+  File "/content/py39env/lib/python3.9/site-packages/gradio/utils.py", line 661, in wrapper
+    response = f(*args, **kwargs)
+  File "/content/rgb-x/normal_irradiance/gradio_demo_normal_irradiance.py", line 139, in callback
+    generated_image_np = cv2.resize(
+cv2.error: OpenCV(4.9.0) /io/opencv/modules/imgproc/src/resize.cpp:3789: error: (-215:Assertion failed) 
+!dsize.empty() in function 'resize'
+
+" Why? 
+
+∴ Thinking…
+
+  The user is encountering an error in their Gradio demo for the normal_irradiance pipeline. The error is:
+
+  cv2.error: OpenCV(4.9.0) /io/opencv/modules/imgproc/src/resize.cpp:3789: error: (-215:Assertion failed) 
+  !dsize.empty() in function 'resize'
+
+  This error occurs at line 139 in the callback function where cv2.resize() is being called. The error message 
+  indicates that the destination size (dsize) is empty, meaning the width or height parameters passed to 
+  cv2.resize() are invalid (likely 0 or negative).
+
+  Let me read the file to understand what's happening:
+
+⏺ I'll help you debug this OpenCV resize error. Let me read the     07:44 PM  claude-sonnet-4-5-20250929
+  file to see what's happening at line 139.
+
+⏺ Read(file_path:
+      "/Users/ishan-aiworkspace/Documents/apps/rgb-x/normal_irradiance/gradio_demo_normal_irradiance.py")
+  ⎿  Read 254 lines
+  ⎿  normal_irradiance/CLAUDE.md
+
+∴ Thinking…
+
+  Looking at the error and the code, the issue is at line 139-143:
+
+  generated_image_np = cv2.resize(
+      generated_image_np,
+      (old_width, old_height),
+      interpolation=cv2.INTER_LINEAR
+  )
+
+  The error says !dsize.empty() assertion failed, which means the destination size is empty. This happens when 
+  old_width or old_height are 0 or invalid.
+
+  Looking at the code earlier, on lines 95-96:
+  old_height = photo.shape[1]
+  old_width = photo.shape[2]
+
+  The issue is that photo is a torch tensor with shape (C, H, W), so:
+  - photo.shape[0] = channels
+  - photo.shape[1] = height
+  - photo.shape[2] = width
+
+  So old_height and old_width are correctly extracted.
+
+  Then on lines 99-106, there's logic to calculate new dimensions:
+  new_height = old_height
+  new_width = old_width
+  radio = old_height / old_width
+  max_side = 1000
+  if old_height > old_width:
+      new_height = max_side
+      new_width = int(new_height / radio)  # BUG HERE!
+  else:
+      new_width = max_side
+      new_height = int(new_width * radio)
+
+  The bug is on line 103! It says:
+  new_width = int(new_height / radio)
+
+  But radio = old_height / old_width, so this should be:
+  new_width = int(new_height / radio)
+
+  Wait, let me think about this more carefully:
+  - radio = old_height / old_width (aspect ratio)
+
+  - The variable is likely a typo, meant to be ratio
+  - When resizing, we want to maintain the original aspect ratio
+  - For portrait images, we fix the height and calculate the width proportionally
+
+  I'll break down the calculation for a specific example to verify the logic. If old_height = 800 and old_width 
+  = 600:
+  - ratio = 800 / 600 = 1.333
+  - When new_height = 1000, we want to find the corresponding new_width
+  - new_width = new_height / ratio = 1000 / 1.333 = 750
+
+  This ensures the image maintains its original proportions while fitting within the maximum side length. I'm 
+  analyzing the image scaling logic, focusing on how to proportionally resize while constraining to a maximum 
+  side length. The current approach calculates new dimensions based on the original image's aspect ratio, but 
+  doesn't guarantee downscaling.
+
+  For portrait images, setting the height to max_side and proportionally adjusting width could potentially 
+  increase image size. Similarly, for landscape images, setting width to max_side might not ensure reduction.
+
+  The core challenge is creating a scaling method that consistently reduces image dimensions while preserving 
+  aspect ratio, regardless of initial orientation. This requires carefully comparing original and target sizes 
+  to determine the appropriate scaling direction.
+
+  The key is to always scale down, never up, which means selecting the dimension that requires the most 
+  significant reduction relative to the max_side constraint. I'm investigating why the image resizing is 
+  failing, focusing on the dimensions of the photo tensor. The problem seems to stem from potentially zero or 
+  negative width and height values. I'll trace the shape extraction carefully, noting that the dimensions are 
+  pulled directly from the photo tensor's shape. Something unusual must be happening with the tensor's initial 
+  dimensions that's causing this resize error.
+
+  The critical clue might be in the pipeline generation process. I'll examine how the generated_image_np is 
+  created, particularly looking at the parameters passed to the pipeline and what might be causing unexpected 
+  image dimensions.
+
+  The height and width calculations seem designed to maintain aspect ratio while constraining the image to a 
+  maximum side length of 1000 pixels. The code ensures the dimensions are divisible by 8, which is likely a 
+  requirement for the image generation model. However, if the original image has extreme proportions, this could
+   potentially lead to very small or zero-sized dimensions.
+
+  I notice the calculation could potentially result in zero or extremely small width/height values if the aspect
+   ratio is unusual. This might explain why the image generation is failing or producing unexpected results. I 
+  see the problem now. When scaling down very small images, the rounding method can reduce dimensions to zero, 
+  which breaks the resizing logic. 
+
+  The key issue occurs with tiny images where integer division by 8 zeroes out the width or height. For 
+  instance, a 5-pixel wide image gets completely eliminated during the rounding process.
+
+  Two potential solutions emerge: either use max() to guarantee a minimum 8-pixel dimension, or employ a ceiling
+   rounding technique that rounds up to the nearest multiple of 8. Both approaches prevent dimension collapse 
+  while maintaining the desired multiple-of-8 constraint.
+
+  The first solution ensures no dimension falls below 8 pixels, while the second method intelligently rounds up,
+   preserving more of the original image's proportional information.
+
+⏺ The error occurs because old_width or old_height becomes 0 after  07:45 PM  claude-sonnet-4-5-20250929
+  the rounding logic on lines 108-110.
+
+  Here's what's happening:
+
+  1. Lines 95-96: Extract original dimensions from the photo tensor
+  2. Lines 99-106: Calculate new dimensions (capping longest side
+  at 1000px)
+  3. Lines 108-110: Round dimensions to multiples of 8 (required by
+   the VAE)
+
+  The bug: When new_width or new_height is less than 8, the integer
+   division new_width // 8 * 8 results in 0!
+
+  For example:
+  - If calculated new_width = 5:
+    - new_width // 8 = 0
+    - new_width // 8 * 8 = 0
+
+  This causes cv2.resize() to fail with "dsize is empty" at line
+  139.
+
+  Fix
+
+  Change lines 108-110 in /Users/ishan-aiworkspace/Documents/apps/r
+  gb-x/normal_irradiance/gradio_demo_normal_irradiance.py to round
+  up instead of down and ensure minimum size of 8:
+
+⏺ Update(/Users/ishan-aiworkspace/Documents/apps/rgb-x/normal_irradiance/gradio_demo_normal_irradiance.py)
+  ⎿ User rejected update /Users/ishan-aiworkspace/Documents/apps/rgb-x/normal_irradiance/gradio_demo_normal_irra
+    to                   diance.py
+      106                new_height = int(new_width * radio)
+      107    
+      108            if new_width % 8 != 0 or new_height % 8 != 0:
+      109 -              new_width = new_width // 8 * 8
+      110 -              new_height = new_height // 8 * 8
+      109 +              new_width = max(8, ((new_width + 7) // 8) * 8)
+      110 +              new_height = max(8, ((new_height + 7) // 8) * 8)
+      111    
+      112            photo = torchvision.transforms.Resize((new_height, new_width))(photo)
+      113    
+
+> I dont think that is the issue. I think the issue has to deal with how you are unpacking the output from 
+the model. Notice these lines from the file that is working: 
+'/Users/ishan-aiworkspace/Documents/apps/rgb-x/rgbx/rgb2x/gradio_demo_rgb2x.py' "for aov_name in 
+required_aovs:
+                prompt = prompts[aov_name]
+                generated_image = pipe(
+                    prompt=prompt,
+                    photo=photo,
+                    num_inference_steps=inference_step,
+                    height=new_height,
+                    width=new_width,
+                    generator=generator,
+                    required_aovs=[aov_name],
+                ).images[0][0]
+
+                generated_image = torchvision.transforms.Resize(
+                    (old_height, old_width)
+                )(generated_image). " Compare it to the one you've written: "generated_image_np = pipe(
+                    prompt=prompt,
+                    photo=photo,
+                    num_inference_steps=inference_step,
+                    height=new_height,
+                    width=new_width,
+                    generator=generator,
+                    required_aovs=[aov_name],
+                    output_type="np",  # Get numpy arrays directly
+                ).images[0]
+
+                # Resize numpy array using cv2
+                generated_image_np = cv2.resize(
+                    generated_image_np,
+                    (old_width, old_height),
+                    interpolation=cv2.INTER_LINEAR
+                )" 
+'/Users/ishan-aiworkspace/Documents/apps/rgb-x/normal_irradiance/gradio_demo_normal_irradiance.py' One when 
+we are using output_type = "np", I think the returned value is an array of first the image and then the nd 
+array and you need to unpack them. Instead, here you are just using .images[0] whereas the original code was
+ .images[0][0] Secondly youre using cv2 instead of torch without a reason for switching. Also, where is the 
+array in your implementtaion. Please explain, 
+  ⎿  ⧉ Selected 17 lines from normal_irradiance/gradio_demo_normal_irradiance.py in Visual Studio Code
+
+∴ Thinking…
+
+  Ah, the user is right! Let me think about this carefully.
+
+  Looking at the working code:
+  generated_image = pipe(
+      prompt=prompt,
+      photo=photo,
+      num_inference_steps=inference_step,
+      height=new_height,
+      width=new_width,
+      generator=generator,
+      required_aovs=[aov_name],
+  ).images[0][0]
+
+  This uses .images[0][0] - double indexing!
+
+  But in the broken code:
+  generated_image_np = pipe(
+      prompt=prompt,
+      photo=photo,
+      num_inference_steps=inference_step,
+      height=new_height,
+      width=new_width,
+      generator=generator,
+      required_aovs=[aov_name],
+      output_type="np",  # Get numpy arrays directly
+  ).images[0]
+
+  This only uses .images[0] - single indexing.
+
+  The user is suggesting that when output_type="np", the pipeline returns something different. Let me read the 
+  pipeline file to understand what's actually being returned.
+
+  Looking at the CLAUDE.md documentation that was returned, it says:
+  **The pipeline supports 4 output types via `output_type` parameter:**
+  1. **`"np"` (NumPy)** - Used by Gradio demo (lines 62-106):
+     - VAE decodes latents to tensor (line 799)
+     - Denormalize to [0, 1] range (lines 89-94)
+     - Apply gamma correction if needed (lines 97-98): `image^(1/2.2)`
+     - Convert to numpy via `pt_to_numpy()` (line 103)
+     - Return shape: `(H, W, C)` with values in [0, 1]
+
+
+
+  I'm investigating the indexing discrepancy between PIL and NumPy output types. The documentation suggests 
+  different processing for NumPy outputs, which might explain the different indexing behavior. I'll need to 
+  verify the exact return structure to understand why .images[0] works for NumPy but not for PIL.
+
+  The key observation is the different output type processing, which could fundamentally change how images are 
+  returned and accessed. Checking the actual pipeline implementation will be crucial to resolving this indexing 
+  issue.
+
+  The OpenCV error about empty dsize hints at potential type conversion or extraction problems when working with
+   different image representations. This suggests the unpacking mechanism might be more complex than initially 
+  assumed.
+
+  I need to investigate the pipeline's return structure carefully to understand what generated_image_np actually
+   contains. The current error implies the data isn't in the expected format for image processing.
+
+⏺ You're absolutely right! Let me read the pipeline file to see     09:07 PM  claude-sonnet-4-5-20250929
+  what's actually being returned:
+
+⏺ Read(file_path:
+      "/Users/ishan-aiworkspace/Documents/apps/rgb-x/normal_irradiance/pipeline_normal_irradiance.py", offset:
+      50, limit: 100)
+  ⎿  Read 100 lines
+
+∴ Thinking…
+
+  Let me look at the call method to see what's returned.
+
+⏺ Let me check the __call__ method to see what structure is         09:07 PM  claude-sonnet-4-5-20250929
+  actually returned:
+
+⏺ Bash(grep -n "return StableDiffusionAOVPipelineOutput"
+      /Users/ishan-aiworkspace/Documents/apps/rgb-x/normal_irradiance/pipeline_normal_irradiance.py)
+  ⎿  822:        return StableDiffusionAOVPipelineOutput(images=aovs)
+
+∴ Thinking…
+
+  Let me read that section of code to see what aovs contains.
+
+⏺ Read(file_path:
+      "/Users/ishan-aiworkspace/Documents/apps/rgb-x/normal_irradiance/pipeline_normal_irradiance.py", offset:
+      790, limit: 40)
+  ⎿  Read 34 lines
+
+∴ Thinking…
+
+  Ok, so at line 817, aovs = [aov] creates a list containing one element.
+
+  Then at line 822, it returns StableDiffusionAOVPipelineOutput(images=aovs).
+
+  So aovs is a list. When output_type="np", the postprocess method (line 105-106) returns a numpy array.
+
+  But wait, let me check what pt_to_numpy does. Let me search for that.
+
+  Actually, looking at line 103, image = self.pt_to_numpy(image).
+
+  The image here is a batch of images as a tensor. So pt_to_numpy probably converts from shape (batch, C, H, W) 
+  to (batch, H, W, C).
+
+  So when output_type="np":
+  - aov from line 811-816 is a numpy array of shape (batch, H, W, C) or maybe just (H, W, C) if batch=1? No, it 
+  should still be (batch, H, W, C).
+  - aovs = [aov] at line 817 wraps this in a list
+  - So .images is a list containing one numpy array
+
+  So .images[0] should give us the numpy array.
+
+  But wait, let me check the default (PIL) mode. When output_type="pil", the postprocess returns the result of 
+  numpy_to_pil(image). Let me check what that returns.
+
+  Actually, looking at the working code again:
+  generated_image = pipe(...).images[0][0]
+
+  This uses double indexing .images[0][0]. This suggests that .images is a list, .images[0] is also a list or 
+  array, and .images[0][0] is the actual image.
+
+  But the user isn't using output_type="np" in the working code. 
+
+  The default output type is "pil", which means numpy_to_pil converts the numpy array to a list of PIL images. 
+  This explains the double indexing in the working code. When calling .images[0][0], the first index selects the
+   first (and likely only) batch of images, and the second index retrieves the first image from that batch.
+
+  So the default behavior creates a nested structure: a list of batches, where each batch is a list of PIL 
+  images. This allows for flexible handling of single or multiple image generation.
+
+  For numpy output, the indexing follows a similar pattern, but with numpy arrays instead of PIL images. The 
+  first index selects the batch, and the second index picks the specific image within that batch.
+
+  When cv2.resize receives a (1, H, W, C) array, it could misinterpret the dimensions. The resize function 
+  expects a standard (H, W, C) format, so the extra batch dimension might cause unexpected resizing behavior.
+
+  To resolve this, we'd need to squeeze out the batch dimension before resizing, ensuring cv2 processes the 
+  image correctly.
+
+  The batch size is confirmed by checking the aov.shape[0], which determines the number of images. After VAE 
+  decoding and converting to numpy, the image array has a batch dimension. To access the first image, we should 
+  use .images[0][0] instead of just .images[0].
+
+  The code originally used torchvision's resize method, which handles batched tensors more naturally compared to
+   cv2's approach.
+
+  I'll verify the image shape to confirm the correct indexing strategy, ensuring we extract the precise first 
+  image from the batch.
+
+⏺ Ah, you're absolutely correct! Let me check what the postprocess  09:08 PM  claude-sonnet-4-5-20250929
+  method actually returns:
+
+⏺ Bash(grep -A 10 "def pt_to_numpy"
+      /Users/ishan-aiworkspace/Documents/apps/rgb-x/normal_irradiance/pipeline_normal_irradiance.py)
+  ⎿  No matches found
+
+∴ Thinking…
+
+  Let me try a different search.
+
+⏺ Let me check the parent class to understand the structure better: 09:08 PM  claude-sonnet-4-5-20250929
+
+⏺ Bash(grep -n "class.*ImageProcessor"
+      /Users/ishan-aiworkspace/Documents/apps/rgb-x/normal_irradiance/pipeline_normal_irradiance.py | head -5)
+  ⎿  32:class VaeImageProcrssorAOV(VaeImageProcessor):
+
+∴ Thinking…
+
+  OK so it inherits from VaeImageProcessor. The pt_to_numpy method is probably from the parent class. Looking at
+   the postprocess code:
+
+  image = self.pt_to_numpy(image)  # line 103
+
+  if output_type == "np":
+      return image  # line 105-106
+
+  So it returns image which is the result of pt_to_numpy(image).
+
+  The image parameter is a tensor of shape (batch, C, H, W) or (batch, H, W, C) after denormalization.
+
+  pt_to_numpy likely converts from (batch, C, H, W) to (batch, H, W, C) and converts to numpy.
+
+  So when output_type="np", the postprocess returns a numpy array of shape (batch, H, W, C).
+
+  Then in the pipeline call method:
+  aov = self.image_processor.postprocess(...)  # Returns (batch, H, W, C) numpy array
+  aovs = [aov]  # Wraps in a list: [numpy_array]
+  return StableDiffusionAOVPipelineOutput(images=aovs)  # images = [numpy_array]
+
+  So:
+  - .images = [numpy_array] where numpy_array has shape (batch, H, W, C)
+  - .images[0] = numpy_array with shape (batch, H, W, C)
+  - .images[0][0] = first image in batch with shape (H, W, C)
+
+  So yes, we need .images[0][0] to get the first image!
+
+  And for the cv2 vs torch question: the working code uses tensors (output_type="pil" by default, which converts
+   to PIL but the intermediate is tensor), so it can use torchvision.transforms.Resize. But we're using numpy 
+  arrays, so we either need to:
+
+  1. Use cv2.resize on the numpy array
+  2. Convert back to tensor, use torch resize, convert back to numpy
+  3. Use output_type="pt" to get tensors directly
+
+  I'll evaluate the most efficient approaches. Option 1 (cv2.resize) or option 3 (output_type="pt") seem most 
+  straightforward. The working code actually uses PIL images from .images[0][0], which suggests a different 
+  conversion strategy than my initial numpy-focused approach.
+
+  PIL images offer flexible resizing through torchvision transforms. I can directly resize the first image in 
+  the batch using torchvision.transforms.Resize(), maintaining image quality and avoiding multiple conversions. 
+  This approach supports both numpy and PIL workflows, providing a versatile solution for image resizing.
+
+⏺ Now I understand! You're right. Let me check the working code     09:08 PM  claude-sonnet-4-5-20250929
+  more carefully:
+
+⏺ Read(file_path: "/Users/ishan-aiworkspace/Documents/apps/rgb-x/rgbx/rgb2x/gradio_demo_rgb2x.py", offset: 120,
+      limit: 30)
+  ⎿  Read 30 lines
+  ⎿  rgbx/rgb2x/CLAUDE.md
+
+∴ Thinking…
+
+  Perfect! Now I see it clearly. The working code uses .images[0][0] and does NOT use output_type="np". It uses 
+  the default output_type="pil" which returns PIL images.
+
+  Looking at line 123 in the working code:
+  ).images[0][0]
+
+  And line 125-127:
+  generated_image = torchvision.transforms.Resize(
+      (old_height, old_width)
+  )(generated_image)
+
+  So generated_image at this point is a PIL Image, and torchvision.transforms.Resize works on PIL images.
+
+  Then at line 131:
+  aov_images[aov_name] = generated_image
+
+  So aov_images contains PIL Images, which are then passed to save_aov_images().
+
+  So the issue with my implementation is:
+
+  1. Wrong indexing: Using .images[0] instead of .images[0][0]
+    - With default output (PIL), .images = [[PIL.Image, PIL.Image, ...]]
+    - .images[0] = [PIL.Image, PIL.Image, ...] (list of images for the batch)
+    - .images[0][0] = first PIL.Image in the batch
+  2. Unnecessary complexity: I'm using output_type="np" which changes the data structure, then trying to use cv2
+   for resizing. But the working code just uses PIL images throughout (easier).
+
+  Actually, wait. Let me think about this more carefully.
+
+  Looking at the pipeline code again, when output_type="pil":
+  - aov = self.image_processor.postprocess(...) returns a list of PIL images (from numpy_to_pil)
+  - aovs = [aov] makes it [[PIL.Image, PIL.Image, ...]]
+
+  - .images[0] gives [PIL.Image, PIL.Image, ...]
+  - .images[0][0] gives the first PIL Image
+
+  With numpy arrays, the indexing follows a different pattern. When output_type="np", the array structure 
+  changes completely. .images[0] becomes a full numpy array representing the batch, while .images[0][0] extracts
+   the first individual image from that batch. This means the shape transforms from (batch, H, W, C) to (H, W, 
+  C), fundamentally altering how we access and manipulate the image data.
+
+  The critical issue emerges when cv2.resize encounters a batch-shaped array, potentially causing processing 
+  errors. To resolve this, two primary strategies exist: either modify the indexing to extract the single image 
+  or adjust the image processing workflow. The user's specific goal of saving as NPY and EXR files suggests we 
+  need numpy arrays, which further complicates the image handling approach.
+
+  Selecting Option B provides a more direct solution. By setting output_type="np" and correcting the indexing to
+   .images[0][0], we can cleanly extract the single image array and prepare it for subsequent saving operations.
+
+⏺ You're absolutely right! The issue is the double indexing. Let me 09:09 PM  claude-sonnet-4-5-20250929
+   explain what's happening:
+
+  Pipeline output structure:
+
+  When you call the pipeline, it returns:
+  - .images = [batch_of_images] (a list containing one batch)
+  - .images[0] = the batch itself (shape: (batch_size, H, W, C) for
+   numpy, or [image1, image2, ...] for PIL)
+  - .images[0][0] = the first image in that batch (shape: (H, W, 
+  C))
+
+  Your current code:
+  generated_image_np = pipe(..., output_type="np").images[0]  # 
+  Gets (1, H, W, C) - still has batch dimension!
+  cv2.resize(generated_image_np, (old_width, old_height))     # cv2
+   expects (H, W, C), not (1, H, W, C)!
+
+  When generated_image_np has shape (1, H, W, C), cv2.resize
+  interprets this as height=1, width=H, channels=W, which creates
+  an invalid size for resizing - hence the "dsize.empty()" error.
+
+  The fix:
+  generated_image_np = pipe(..., output_type="np").images[0][0]  # 
+  Gets (H, W, C) - single image!
+
+  As for cv2 vs torch: The working code uses the default
+  output_type="pil" which returns PIL Images, so it uses
+  torchvision.transforms.Resize which works on PIL. You switched to
+   output_type="np" to get numpy arrays directly, so using
+  cv2.resize makes sense. But you need to fix the indexing first.
+
+  Let me fix this:
+
+⏺ Update(/Users/ishan-aiworkspace/Documents/apps/rgb-x/normal_irradiance/gradio_demo_normal_irradiance.py)
+

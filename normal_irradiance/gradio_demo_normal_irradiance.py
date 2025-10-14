@@ -133,7 +133,7 @@ def get_rgb2x_demo():
                     generator=generator,
                     required_aovs=[aov_name],
                     output_type="np",  # Get numpy arrays directly
-                ).images[0]
+                ).images[0][0]
 
                 # Resize numpy array using cv2
                 generated_image_np = cv2.resize(
