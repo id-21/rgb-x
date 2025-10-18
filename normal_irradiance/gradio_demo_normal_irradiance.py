@@ -59,6 +59,11 @@ def get_rgb2x_demo():
                 # INVERT: Model outputs bright=shadow, we need bright=light
                 img_inverted = 1.0 - img_np
 
+                # Save NPY (gamma-corrected, inverted)
+                npy_path = os.path.join(output_dir, "irradiance_gamma.npy")
+                np.save(npy_path, img_inverted.astype(np.float32))
+                saved_files["irradiance_npy"] = npy_path
+
                 # Reverse gamma correction to get linear RGB: linear = gamma^2.2
                 img_linear = img_inverted ** 2.2
                 exr_path = os.path.join(output_dir, "irradiance_shadow.exr")
@@ -146,9 +151,12 @@ def get_rgb2x_demo():
                 if i == 0:
                     aov_images[aov_name] = generated_image_np
 
-                # Convert to tensor for Gradio gallery display (C, H, W)
-                display_tensor = torch.from_numpy(generated_image_np.transpose(2, 0, 1))
-                return_list.append((display_tensor, f"Generated {aov_name} {i}"))
+                # Convert numpy → PIL for Gradio gallery display (Gradio 3.48.0 requires PIL)
+                # numpy is in (H, W, C) format, range [0, 1]
+                display_image = Image.fromarray(
+                    (np.clip(generated_image_np, 0, 1) * 255).astype(np.uint8)
+                )
+                return_list.append((display_image, f"Generated {aov_name} {i}"))
 
         # Create white wall × shadow visualization
         if "irradiance" in aov_images:
@@ -164,11 +172,13 @@ def get_rgb2x_demo():
             # Multiply: white × shadow = shaded white surface (in gamma space for quick preview)
             shaded_white = white_surface * shadow_inverted
 
-            # Convert to tensor for display (C, H, W)
-            shaded_white_tensor = torch.from_numpy(shaded_white.transpose(2, 0, 1))
+            # Convert numpy → PIL for Gradio display (Gradio 3.48.0 requires PIL)
+            shaded_white_image = Image.fromarray(
+                (np.clip(shaded_white, 0, 1) * 255).astype(np.uint8)
+            )
 
             # Add to gallery with descriptive label
-            return_list.append((shaded_white_tensor, "White Wall × Shadow (Debug Visualization)"))
+            return_list.append((shaded_white_image, "White Wall × Shadow (Debug Visualization)"))
 
         # Save images and get file paths
         saved_files = save_aov_images(aov_images)
