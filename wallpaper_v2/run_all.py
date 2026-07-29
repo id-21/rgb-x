@@ -519,6 +519,33 @@ def main():
     print("=" * 70)
 
 
+def main_emit_scene(name, max_width=None):
+    """Emit one sample's scene.json + maps.png + photo.jpg bundle."""
+    from scene.emit import emit_scene
+    out = Path(__file__).parent / "scene" / "outputs" / name
+    emit_scene(name, out, max_width=max_width)
+    print(f"  + {out}/scene.json + maps.png + photo.jpg")
+
+
+def main_emit_all(max_width=None):
+    """Emit bundles for every sample with the required inputs."""
+    from scene.emit import emit_scene
+    samples = sorted(p.name for p in BATCH.iterdir() if p.is_dir())
+    ok, failed = [], []
+    for name in samples:
+        out = Path(__file__).parent / "scene" / "outputs" / name
+        try:
+            emit_scene(name, out, max_width=max_width)
+            ok.append(name)
+            print(f"  + {name}")
+        except Exception as e:
+            failed.append(f"{name}: {type(e).__name__}: {e}")
+            print(f"  !! SKIP {name}: {e}")
+    print(f"\nemitted {len(ok)}/{len(samples)} bundles")
+    for f in failed:
+        print("  SKIPPED:", f)
+
+
 if __name__ == "__main__":
     a = sys.argv[1:]
     if a and a[0] == "--one":
@@ -527,5 +554,9 @@ if __name__ == "__main__":
         main_comparisons()
     elif a and a[0] == "--collect":
         collect()
+    elif a and a[0] == "--emit-scene":
+        main_emit_scene(a[1])
+    elif a and a[0] == "--emit-all":
+        main_emit_all()
     else:
         main()

@@ -8,6 +8,7 @@ normal_irradiance/example/
 *.jpg
 *.jpeg
 wallpaper_v2/outputs/
+wallpaper_v2/scene/outputs/
 normal_irradiance/venv/
 Notebook for Output visualisation/venv_notebook/
 .DS_Store
