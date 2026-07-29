@@ -421,11 +421,67 @@ Metrics:
 
 ## Definition of done
 
-- [ ] `scene-v1.schema.json` and `SCHEMA.md` committed, conventions asserted by test
-- [ ] every eval sample emits a valid bundle
-- [ ] camera intrinsics provably resolution-invariant
-- [ ] encoding decisions made from measurement, recorded in `SCHEMA.md`
-- [ ] golden bundles committed with a regeneration procedure
-- [ ] reference consumer reproduces the pipeline render at ≥ 45 dB from the bundle alone
-- [ ] every schema field demonstrably affects the output
-- [ ] median bundle size recorded — expect well under 1 MB
+- [x] `scene-v1.schema.json` and `SCHEMA.md` committed, conventions asserted by test
+- [x] every eval sample emits a valid bundle
+- [x] camera intrinsics provably resolution-invariant
+- [x] encoding decisions made from measurement, recorded in `SCHEMA.md`
+- [x] golden bundles committed with a regeneration procedure
+- [x] reference consumer reproduces the pipeline render at ≥ 45 dB from the bundle alone
+- [x] every schema field demonstrably affects the output (except `gravity` — deliberate, documented exception)
+- [x] median bundle size recorded — **not** well under 1 MB (see note below)
+
+### Notes on how these closed out, vs. the plan as originally written
+
+**Bundle grew a fourth file.** P3-T3's measurement showed 8-bit shading
+(as originally specified, packed into `maps.png`'s G channel) causes up to
+3/255 render delta in the wall interior — over the plan's own 2/255 banding
+gate. Shading moved to its own 16-bit PNG (`shading.png`); `maps.png` is now
+R = region id, G = unused/reserved, B = alpha. Full rationale and numbers in
+`scene/SCHEMA.md`'s "Encoding budget" section.
+
+**Median bundle size did NOT land under 1 MB (~1.75 MB measured).** This
+was a real, deliberate non-closure, not an oversight: the plan's own P3-T3
+section only asks for a JPEG-quality and shading-precision decision, not a
+target resolution — bundle downscaling for a web service is explicitly
+listed under "Out of scope for Phase 3." The size overshoot is almost
+entirely `photo.jpg` at full working (MAXPIXELS-capped) resolution, not
+scene.json/maps.png/shading.png overhead. Whoever builds the Phase 4/web
+service should pick a `max_width` and re-run
+`scene/experiments/encoding_budget.py`'s JPEG-quality sweep at that
+resolution (PSNR-per-quality shifts with image size).
+
+**P3-T5 surfaced two real emitter bugs, both fixed in `scene/emit.py`**,
+not just measured: (1) isolated same-plane pixel fragments that
+`geometry.extract_regions` drops (its own documented behavior) were
+unreachable from a region-id-only bundle even though production still
+renders them from the raw plane `labels` — fixed by backfilling orphans into
+an existing region of their own plane; (2) a handful of those same orphans
+have `t <= 0` (ray/plane intersection behind the camera) — `geometry.
+compute_uv` doesn't itself filter on sign, only on grazing angle — and
+backfilling them would have violated the `d > 0, t > 0` sign convention this
+document asserts elsewhere, so those specific pixels (190/~2.8M on
+`no_walls_living`, 154/~4.9M on `obstacle_course_living`) are left
+unreproducible from the bundle by design rather than either silently
+breaking the invariant or leaving the bigger completeness hole open. Full
+writeup in `scene/SCHEMA.md`'s "Reference consumer (P3-T5 findings)"
+section.
+
+**The ≥45 dB gate is measured in the wall interior (`alpha >= 0.99`), not
+full-frame**, and reference renders are built from the SAME geometry pass as
+the bundle rather than compared against a separately-committed `final.png`.
+Reason for both: (a) full-frame PSNR is dominated by `photo.jpg`'s JPEG
+recompression wherever `alpha` is low (pure photo passthrough), which is
+already measured and gated separately by P3-T3 (JPEG quality 92, PSNR ≥ 40
+dB) — re-gating the same lossy-photo decision here under an undocumented
+threshold would double-count it; (b) `cluster_planes`' k-means is not
+bit-reproducible across separate process invocations (Phase 2 T0's noise
+floor), so an early attempt at this comparison against an old `final.png`
+was measuring cross-process clustering drift, not bundle sufficiency.
+Measured interior PSNR across all 12 samples: 51–81 dB. Max-channel-delta is
+reported per sample (not gated): it's 1/255 on 10 of 12 samples, and up to
+~86/255 on a small number of pixels (0.003%–0.13% of the interior) on the
+two samples with the largest excluded-orphan patches, traced to
+`sample_texture`'s known gradient-at-an-array-edge footprint artifact
+(the same class Phase 2 T4 already found and gated by fraction rather than
+a fixed max) — its size scales with patch size per sample, so no single
+fixed threshold is a meaningful gate; PSNR is.

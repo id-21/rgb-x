@@ -52,6 +52,66 @@ def _region_area_m2(uv, region_labels, rid):
     return float((u.max() - u.min()) * (v.max() - v.min()))
 
 
+def _backfill_orphan_plane_pixels(labels, region_labels, regions, planes, f, cx, cy):
+    """
+    extract_regions can drop an isolated same-plane fragment that has no
+    ADJACENT region to merge into (documented in its own docstring): those
+    pixels stay -1 in region_labels. Production still renders them --
+    run_all.process() calls sample_texture with the raw plane `labels`, never
+    region_labels -- but a region-id-only bundle has no way to recover a
+    pixel with no region. P3-T5's consumer found this: it measured a max
+    channel delta of 228/255 on fully-opaque interior pixels, traced to
+    exactly these orphans (see scene/consume.py's docstring / SCHEMA.md).
+
+    Fix, scoped to the bundle only (does not touch extract_regions' own
+    contract or `regions[]`' selection semantics elsewhere): route each
+    orphan pixel to an arbitrary EXISTING region of its own plane. This is
+    correct because UV/texture are shared across every region of a plane
+    (the T4 finding) -- rendering only needs to know the PLANE, not which
+    region label a pixel carries. The chosen region's `npix` is increased to
+    match, so scene.json stays internally consistent with maps.png.
+
+    NOT every orphan is backfilled, though: compute_uv only drops pixels
+    whose ray is nearly PARALLEL to the plane (|n.r| < grazing_tol); it does
+    not check the SIGN of the intersection, so a pixel whose ray/plane
+    intersection lies behind the camera (t <= 0) can still end up in
+    `labels` with a geometrically meaningless UV. These are rare (an
+    isolated-fragment problem, not a general one -- found on
+    obstacle_course_living, 144/62257 pixels of one region, all in a single
+    contiguous strip, almost certainly a foreground object silhouette
+    parallax-mismatched into the wall's normal cluster) but backfilling them
+    would violate the sign convention SCHEMA.md asserts (n.X = d, d > 0, t >
+    0 -- see test_emit.py's sign-convention test). Left as -1: production's
+    own render is already geometrically meaningless there, so the bundle
+    losing those specific pixels is not a completeness regression worth
+    having over a documented invariant.
+    """
+    orphans = (labels >= 0) & (region_labels < 0)
+    if not orphans.any():
+        return
+    primary_region_of_plane = {}
+    for rid, r in regions.items():
+        pid = r["plane"]
+        if pid not in primary_region_of_plane or \
+                r["npix"] > regions[primary_region_of_plane[pid]]["npix"]:
+            primary_region_of_plane[pid] = rid
+    for pid, rid in primary_region_of_plane.items():
+        sel = orphans & (labels == pid)
+        ys, xs = np.nonzero(sel)
+        if len(ys) == 0:
+            continue
+        n, d = planes[pid]["n"], planes[pid]["d"]
+        rx, ry = (xs - cx) / f, (ys - cy) / f
+        denom = rx * n[0] + ry * n[1] + n[2]
+        valid = np.abs(denom) > 1e-9
+        t = np.where(valid, d / np.where(valid, denom, 1.0), -1.0)
+        keep = valid & (t > 0)
+        ys, xs = ys[keep], xs[keep]
+        if len(ys):
+            region_labels[ys, xs] = rid
+            regions[rid]["npix"] += len(ys)
+
+
 def _load_geometry(name, max_width):
     """Run the pipeline through region extraction + shading. No compositing."""
     g = find_inputs(name)
@@ -106,6 +166,7 @@ def _load_geometry(name, max_width):
         raise ValueError(f"{name}: no planes fitted")
     uv, info = compute_uv(labels, planes, grav, f, cx, cy)
     region_labels, regions = extract_regions(labels)
+    _backfill_orphan_plane_pixels(labels, region_labels, regions, planes, f, cx, cy)
 
     checks = verify(planes, grav, info)
     angs = [v for k, v in [(c[0], c[1]) for c in checks] if k.startswith("angle")]

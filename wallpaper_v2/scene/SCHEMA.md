@@ -153,6 +153,102 @@ output archived in `scene/experiments/encoding_budget.json`.
   `encoding_budget.py`'s JPEG-quality measurement at whatever `max_width` it
   settles on, since PSNR at a given quality changes with resolution.
 
+## Reference consumer (P3-T5 findings)
+
+`scene/consume.py` reimplements ray/plane intersection, UV, texture sampling
+and linear-space compositing from the bundle alone (no `geometry.py` import,
+no `.npy` read — enforced by `scene/tests/test_consumer.py`'s isolation
+test). Building it surfaced two real gaps in the emitter, both now fixed in
+`scene/emit.py`, and one deliberate scope decision in how the resulting
+render is compared against the pipeline's own output.
+
+**Gap 1 — orphan plane pixels weren't in any region.**
+`geometry.extract_regions` can drop an isolated same-plane fragment that has
+no ADJACENT region to merge into (its own docstring documents this).
+Production still renders those pixels — `run_all.process()` calls
+`sample_texture` with the raw plane `labels`, never `region_labels` — but a
+region-id-only `maps.png` has no way to recover a pixel with no region.
+Measured impact before the fix: up to 228/255 max channel delta on
+fully-opaque interior pixels on `complex_living`. Fixed by
+`emit._backfill_orphan_plane_pixels`: route each orphan pixel into an
+*existing* region of its own plane (correct because UV/texture are shared
+across every region of a plane — the Phase 2 T4 finding — so rendering only
+needs to know the plane, not which region label a pixel carries).
+
+**Gap 2 — some orphans have no valid ray/plane intersection at all.**
+`geometry.compute_uv` only drops pixels whose ray is nearly PARALLEL to the
+plane (`|n·r| < grazing_tol`); it does not check the SIGN of the
+intersection. A handful of isolated-fragment pixels (found on
+`obstacle_course_living`: 144/62257 pixels of one region, forming a single
+contiguous strip — almost certainly a foreground object silhouette
+parallax-mismatched into the wall's normal cluster) have `t <= 0`: a
+"hit point" behind the camera, violating the sign convention this document
+asserts elsewhere. Backfilling them (Gap 1's fix) would ship pixels that
+break `d > 0, t > 0` — a guarantee future consumers (a WebGL fragment
+shader, say) may rely on to avoid dividing by a near-zero or
+sign-flipped denominator. Resolution: `_backfill_orphan_plane_pixels` also
+checks `t > 0` per candidate pixel and drops (leaves unassigned) any that
+fail. Consequence, measured: a tiny number of plane-labelled pixels per
+sample remain unreproducible from the bundle by construction —
+`no_walls_living`: 190/~2.8M px (0.0068%), `obstacle_course_living`:
+154/~4.9M px. This is judged the right trade: those pixels' own position is
+already geometrically meaningless in production's render (it computes the
+same `t <= 0` intersection, just doesn't check it), so losing them from the
+bundle is not a completeness regression worth having over a documented,
+testable invariant.
+
+**Gate scoping — PSNR is the gate; max-channel-delta is reported, not
+gated.** `scene/tests/test_consumer.py` compares `consume.render_from_bundle`
+against the pipeline's own render **built from the same geometry pass**
+(not a separately-committed `final.png` — cluster_planes' k-means is not
+bit-reproducible across separate process invocations, per Phase 2 T0's
+noise floor, and comparing across two different runs was initially measuring
+that cross-process drift instead of bundle sufficiency). Two exclusions are
+applied before comparing:
+- pixels with no region at all (Gap 2's deliberate exclusion) can't be
+  reproduced by construction and are excluded from the comparison, not
+  padded over;
+- the comparison is restricted to `alpha >= 0.99` ("interior") to separate
+  actual rendering correctness from `photo.jpg`'s JPEG loss, which shows up
+  everywhere alpha is low (pure photo passthrough) and is already measured
+  and gated by P3-T3 (JPEG quality 92, PSNR ≥ 40 dB) — re-gating the same
+  lossy-photo decision here under a stricter, undocumented threshold would
+  double-count it.
+
+Measured interior PSNR across all 12 samples: **51–81 dB**, comfortably
+clearing the plan's 45 dB gate on every sample. Max channel delta in the
+interior is 1/255 on 10 of 12 samples; the remaining two
+(`no_walls_living`, `obstacle_course_living`) show a small band of larger
+deltas (up to ~86–79/255, affecting 0.003%–0.13% of interior pixels)
+immediately at the boundary of an excluded orphan patch. Traced to
+`render.sample_texture`'s known `np.gradient`-at-an-array-edge footprint
+artifact — the same narrow, bounded seam effect Phase 2 T4 already
+documented and gated by fraction rather than a hard max
+(`harness/test_regions.py`'s `test_render_invariance`). Because the
+*fraction* affected scales with how large the excluded-orphan patch happens
+to be on a given sample (not a fixed size), no single fixed threshold — max
+delta or fraction — is a meaningful gate here; PSNR is. Max-delta is printed
+per sample as a diagnostic, not asserted.
+
+**Schema fields with no measurable render effect: `gravity`.** P3-T5's
+ablation test corrupts each render-relevant field and confirms the render
+changes; all 10 fields it exercises (camera intrinsics, plane normal/d/axes/
+origin, `shading.scale`, `pattern.default_width_m`) are load-bearing.
+`gravity` is deliberately excluded from that set: it has no effect on
+`consume.py`'s render, because every plane's `u_axis`/`v_axis`/`origin` are
+already derived from it upstream (`geometry.plane_basis`) and baked into
+`scene.json` directly — see "`u_axis`/`v_axis`/`origin` are emitted
+explicitly" above. It is retained for provenance and orthogonality
+validation (a future consumer computing a NEW plane not in the original set,
+or a QA check that `v_axis` is genuinely gravity-aligned), not because
+rendering consumes it. This is a documented exception, not an oversight —
+UI-only/diagnostic fields (`px_share`, `confidence`, `model_vs_depth_deg`,
+`suggested_label`, `regions[].npix`/`area_m2`/`centroid_px`/`bbox_px`,
+`quality.*`, `version`, `pipeline_sha`) are excluded from the ablation set
+for the same reason: SCHEMA.md already documents them as not consumed by
+any renderer, so testing that corrupting them has "no effect" would just be
+re-confirming their own documentation.
+
 ## Sub-schemas / non-goals
 
 - No WebGL, shader, or browser-specific fields here — out of scope for
