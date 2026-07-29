@@ -18,7 +18,8 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent))
 from geometry import (load_normals, estimate_gravity, cluster_planes,
-                      fit_planes, compute_uv, verify, WALL_CONF_T)
+                      fit_planes, compute_uv, verify, WALL_CONF_T,
+                      extract_regions, suggested_label)
 from render import (sample_texture, shading_from_irradiance,
                     shading_from_luminance, composite, feather_mask,
                     irradiance_polarity)
@@ -163,6 +164,8 @@ def process(name, texture_bgr, tag, save_steps=True):
     angs = [v for k, v in [(c[0], c[1]) for c in checks] if k.startswith("angle")]
     wall_coverage = float((labels >= 0).sum() / max(mask.sum(), 1))
 
+    region_labels, regions = extract_regions(labels)
+
     diag = dict(
         sample=name, texture=tag,
         normals_were_encoded=bool(was_enc),
@@ -186,6 +189,13 @@ def process(name, texture_bgr, tag, save_steps=True):
             grazing_px_dropped=int(info[l]['degenerate']),
             confidence=float(p['confidence']),
         ) for l, p in planes.items()},
+        regions={int(r): dict(
+            plane=reg['plane'],
+            npix=reg['npix'],
+            centroid_px=[float(x) for x in reg['centroid_px']],
+            bbox_px=[int(x) for x in reg['bbox_px']],
+            suggested_label=suggested_label(planes[reg['plane']]['n']),
+        ) for r, reg in regions.items()},
     )
     print(f"      gravity tilt {tilt:.1f} deg"
           f"{' (AMBIGUOUS: one wall only)' if grav_ambiguous else ''} | {len(planes)} planes | "
@@ -224,9 +234,10 @@ def process(name, texture_bgr, tag, save_steps=True):
                     cv2.cvtColor(res_lab, cv2.COLOR_RGB2BGR))
     if save_steps:
         save_diagnostics(od, rgb, normals, labels, uv, sampled,
-                         sh_irr if sh_irr is not None else sh_lab, primary, mask)
+                         sh_irr if sh_irr is not None else sh_lab, primary, mask,
+                         region_labels=region_labels)
     (od / "diagnostics.json").write_text(json.dumps(diag, indent=2))
-    del normals, depth, conf, irr, uv, labels, sampled, sh_lab, sh_irr, primary
+    del normals, depth, conf, irr, uv, labels, region_labels, sampled, sh_lab, sh_irr, primary
     gc.collect()
     return dict(diag=diag, dir=str(od)), None
 
@@ -236,7 +247,9 @@ def process(name, texture_bgr, tag, save_steps=True):
 def _colorise(labels):
     out = np.zeros(labels.shape + (3,), np.uint8)
     pal = np.array([[46, 134, 222], [255, 159, 67], [16, 172, 132],
-                    [238, 82, 83], [162, 155, 254]], np.uint8)
+                    [238, 82, 83], [162, 155, 254], [255, 206, 84],
+                    [72, 219, 251], [255, 107, 129], [10, 189, 227],
+                    [95, 39, 205], [201, 24, 74], [0, 148, 50]], np.uint8)
     for i, l in enumerate([x for x in np.unique(labels) if x >= 0]):
         out[labels == l] = pal[i % len(pal)]
     return out
@@ -256,7 +269,8 @@ def _shrink(im, maxw=1100):
                       interpolation=cv2.INTER_AREA)
 
 
-def save_diagnostics(od, rgb, normals, labels, uv, sampled, shading, final, mask):
+def save_diagnostics(od, rgb, normals, labels, uv, sampled, shading, final, mask,
+                     region_labels=None):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -267,18 +281,20 @@ def save_diagnostics(od, rgb, normals, labels, uv, sampled, shading, final, mask
     vvis = _norm8(np.where(labels >= 0, uv[..., 1], np.nan))
 
     # These are diagnostics, not deliverables -- render them small. At native
-    # 4k resolution eight imshow panels are enough to exhaust memory on their own.
+    # 4k resolution nine imshow panels are enough to exhaust memory on their own.
     panels = [
         (rgb, "Original"),
         (nvis, "Normals (decoded, masked)"),
         (_colorise(labels), "Planes (merged)"),
+        (_colorise(region_labels) if region_labels is not None else _colorise(labels),
+         "Regions (selection)"),
         (uvis, "U (metres on plane)"),
         (vvis, "V (metres on plane)"),
         (sampled, "Texture via homography"),
         (_norm8(shading), "Shading field"),
         (final, "Final"),
     ]
-    fig, axes = plt.subplots(2, 4, figsize=(24, 10))
+    fig, axes = plt.subplots(3, 3, figsize=(24, 15))
     for ax, (im, t) in zip(axes.ravel(), panels):
         im = _shrink(im)
         ax.imshow(im, cmap=None if im.ndim == 3 else "magma")

@@ -453,6 +453,121 @@ def compute_uv(labels, planes, gravity, f, cx, cy, grazing_tol=0.08):
 
 
 # ---------------------------------------------------------------------------
+# 5b. Regions: selection layer over planes
+# ---------------------------------------------------------------------------
+
+def suggested_label(n, axis_tol=0.7):
+    """
+    A human-readable guess at which wall this is, from the plane normal
+    alone. Camera looks down +z; fit_planes flips each normal's sign so that
+    n . X = d with d > 0 -- since points in front of the camera have Z > 0
+    (and, for a wall on the right of frame, X > 0), that convention makes n
+    point the SAME way as the wall's own position, not the physically
+    outward-facing surface normal you might expect. Concretely: the far wall
+    you're looking at ends up with n_z > 0, not < 0. Purely a UI hint, not
+    used anywhere in the geometry itself.
+    """
+    if abs(n[2]) >= axis_tol and abs(n[2]) >= abs(n[0]):
+        return "back wall"
+    if abs(n[0]) >= axis_tol:
+        return "right wall" if n[0] > 0 else "left wall"
+    return "angled wall"
+
+
+def extract_regions(labels, min_region_px=1500, connectivity=8):
+    """
+    Decompose each plane's pixel set into connected components ("regions"),
+    the unit of user selection and per-wall texture assignment.
+
+    Planes stay the unit of GEOMETRY: UV comes from ray/plane intersection
+    against one shared (n, d, u_axis, v_axis, origin) per plane, so pattern
+    continuity across a gap -- e.g. a doorway splitting one wall into two
+    components -- is unaffected by how many regions that plane decomposes
+    into. Regions carry no geometric meaning of their own; this function only
+    reads `labels`, never plane parameters, and never touches UV.
+
+    Regions below `min_region_px` are merged into the nearest ADJACENT
+    (8-connectivity-touching, not just closest-centroid) region on the SAME
+    plane, if one exists; otherwise their pixels are dropped back to -1
+    (consistent with cluster_planes: no fallback assigns a pixel to a
+    plane/region it doesn't clearly belong to). If EVERY component of a
+    plane is below the floor, the largest one is kept anyway so the plane
+    always has at least one region. A merged region therefore always stays a
+    single connected component -- merging into a same-plane component that
+    only happens to be nearby (e.g. across a corner) would silently break
+    that invariant.
+
+    Only reads `labels` -- doesn't need plane parameters, so `suggested_label`
+    (which needs a plane normal) is the caller's job; see `suggested_label`
+    above.
+
+    Returns (region_labels (H,W) int32 with -1 = none, regions: dict[int, dict])
+    where regions[i] = {
+        'plane': int, 'npix': int, 'centroid_px': (x, y),
+        'bbox_px': (x0, y0, x1, y1),
+    }
+    """
+    region_labels = np.full(labels.shape, -1, dtype=np.int32)
+    regions = {}
+    next_id = 0
+
+    for plane_id in sorted(int(l) for l in np.unique(labels) if l >= 0):
+        sel = (labels == plane_id).astype(np.uint8)
+        n_comp, cc, stats, centroids = cv2.connectedComponentsWithStats(sel, connectivity=connectivity)
+
+        comps = []
+        for c in range(1, n_comp):     # 0 is background
+            npix = int(stats[c, cv2.CC_STAT_AREA])
+            if npix == 0:
+                continue
+            comps.append(dict(
+                comp_id=c, npix=npix,
+                centroid=(float(centroids[c][0]), float(centroids[c][1])),
+                bbox=(int(stats[c, cv2.CC_STAT_LEFT]), int(stats[c, cv2.CC_STAT_TOP]),
+                      int(stats[c, cv2.CC_STAT_LEFT] + stats[c, cv2.CC_STAT_WIDTH]),
+                      int(stats[c, cv2.CC_STAT_TOP] + stats[c, cv2.CC_STAT_HEIGHT])),
+            ))
+
+        big = [c for c in comps if c["npix"] >= min_region_px]
+        if not big and comps:          # keep the plane alive: promote the largest
+            big = [max(comps, key=lambda c: c["npix"])]
+        big_ids = {b["comp_id"] for b in big}
+        small = [c for c in comps if c["comp_id"] not in big_ids]
+
+        comp_to_region = {}
+        for b in big:
+            rid = next_id
+            next_id += 1
+            comp_to_region[b["comp_id"]] = rid
+            region_labels[cc == b["comp_id"]] = rid
+            regions[rid] = dict(plane=plane_id, npix=b["npix"],
+                                centroid_px=b["centroid"], bbox_px=b["bbox"])
+
+        kernel = np.ones((3, 3), np.uint8)
+        for s in small:
+            # "nearest ADJACENT region" means touching, not just closest
+            # centroid -- a small stray patch elsewhere on the same plane
+            # (e.g. the far side of a corner) is not the same region, and
+            # merging into it would make the result not 8-connected.
+            dilated = cv2.dilate((cc == s["comp_id"]).astype(np.uint8), kernel).astype(bool)
+            touching = [b for b in big if np.any(dilated & (cc == b["comp_id"]))]
+            if not touching:
+                continue                    # dropped: stays -1
+            j = int(np.argmin([(b["centroid"][0] - s["centroid"][0]) ** 2
+                               + (b["centroid"][1] - s["centroid"][1]) ** 2
+                               for b in touching]))
+            rid = comp_to_region[touching[j]["comp_id"]]
+            region_labels[cc == s["comp_id"]] = rid
+            r = regions[rid]
+            r["npix"] += s["npix"]
+            x0, y0, x1, y1 = r["bbox_px"]
+            sx0, sy0, sx1, sy1 = s["bbox"]
+            r["bbox_px"] = (min(x0, sx0), min(y0, sy0), max(x1, sx1), max(y1, sy1))
+
+    return region_labels, regions
+
+
+# ---------------------------------------------------------------------------
 # 6. Verification helpers
 # ---------------------------------------------------------------------------
 
