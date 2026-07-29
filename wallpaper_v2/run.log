@@ -1,0 +1,74 @@
+  !! SKIP bed_back_bedroom: no Depth Pro focal length (_focal_length.npy)
+
+=== complex_living  [30106] ===
+      normals: ENCODED [0,1] -> decoded, z negated -> OpenCV frame (median |n| raw=1.183 decoded=0.978)
+      f = 1906.8 px at native, 1489.7 px at 2000x1333 (0.74 x width)
+      gravity tilt 5.0 deg | 4 planes | wall angles ['86', '88', '54', '2', '33', '34'] | vertical extent 3.01 m
+
+=== fluted_walls_living  [30106] ===
+      normals: ENCODED [0,1] -> decoded, z negated -> OpenCV frame (median |n| raw=1.189 decoded=0.973)
+      f = 1861.1 px at native, 1861.1 px at 1500x1300 (1.24 x width)
+      gravity tilt 5.7 deg | 2 planes | wall angles ['69'] | vertical extent 3.78 m
+
+=== living_simple2  [30106] ===
+      normals: ENCODED [0,1] -> decoded, z negated -> OpenCV frame (median |n| raw=1.170 decoded=1.000)
+      f = 473.4 px at native, 473.4 px at 1024x682 (0.46 x width)
+      gravity tilt 2.3 deg | 3 planes | wall angles ['78', '14', '88'] | vertical extent 3.57 m
+
+=== living_small_walls  [30106] ===
+      normals: ENCODED [0,1] -> decoded, z negated -> OpenCV frame (median |n| raw=1.221 decoded=0.993)
+      f = 1758.4 px at native, 1172.3 px at 2000x1333 (0.59 x width)
+      gravity tilt 3.1 deg | 2 planes | wall angles ['14'] | vertical extent 2.91 m
+
+=== no_walls_living  [30106] ===
+      normals: ENCODED [0,1] -> decoded, z negated -> OpenCV frame (median |n| raw=1.202 decoded=0.961)
+      f = 3643.2 px at native, 1663.6 px at 2000x1333 (0.83 x width)
+      gravity tilt 3.1 deg | 2 planes | wall angles ['85'] | vertical extent 2.93 m
+
+=== obstacle_course_living  [30106] ===
+      normals: ENCODED [0,1] -> decoded, z negated -> OpenCV frame (median |n| raw=1.220 decoded=0.988)
+      f = 861.3 px at native, 861.3 px at 1280x720 (0.67 x width)
+      gravity tilt 5.3 deg | 4 planes | wall angles ['84', '46', '29', '50', '81', '58'] | vertical extent 2.88 m
+
+=== perspective_living  [30106] ===
+      normals: ENCODED [0,1] -> decoded, z negated -> OpenCV frame (median |n| raw=1.181 decoded=0.991)
+      f = 1279.4 px at native, 999.5 px at 2000x1334 (0.50 x width)
+      gravity tilt 2.8 deg | 4 planes | wall angles ['3', '87', '88', '85', '86', '1'] | vertical extent 2.95 m
+
+=== room1  [30106] ===
+      normals: ENCODED [0,1] -> decoded, z negated -> OpenCV frame (median |n| raw=1.129 decoded=0.981)
+      f = 3202.7 px at native, 1423.4 px at 1333x2000 (1.07 x width)
+      gravity tilt 76.6 deg | 1 planes | wall angles [] | vertical extent 3.61 m
+
+=== simple_living  [30106] ===
+      normals: ENCODED [0,1] -> decoded, z negated -> OpenCV frame (median |n| raw=1.228 decoded=0.992)
+      f = 1480.1 px at native, 870.7 px at 2000x1304 (0.44 x width)
+      gravity tilt 4.6 deg | 3 planes | wall angles ['82', '89', '7'] | vertical extent 3.21 m
+
+=== simple_living_2  [30106] ===
+      normals: ENCODED [0,1] -> decoded, z negated -> OpenCV frame (median |n| raw=1.209 decoded=0.968)
+      f = 2075.4 px at native, 1383.6 px at 2000x1125 (0.69 x width)
+      gravity tilt 1.6 deg | 2 planes | wall angles ['83'] | vertical extent 2.83 m
+
+=== simple_living_3  [30106] ===
+      normals: ENCODED [0,1] -> decoded, z negated -> OpenCV frame (median |n| raw=1.226 decoded=1.000)
+      f = 1086.0 px at native, 1086.0 px at 1400x933 (0.78 x width)
+      gravity tilt 2.3 deg | 3 planes | wall angles ['84', '84', '12'] | vertical extent 2.94 m
+
+=== living_simple2  [wallpaper_predicted_focal_length] ===
+      normals: ENCODED [0,1] -> decoded, z negated -> OpenCV frame (median |n| raw=1.170 decoded=1.000)
+      f = 473.4 px at native, 473.4 px at 1024x682 (0.46 x width)
+      gravity tilt 2.3 deg | 3 planes | wall angles ['78', '14', '88'] | vertical extent 3.57 m
+  !! SKIP comparison bed_back_bedroom: no Depth Pro focal length (_focal_length.npy)
+  !! SKIP comparison bed_back_bedroom: no Depth Pro focal length (_focal_length.npy)
+  !! SKIP comparison bed_back_bedroom: no Depth Pro focal length (_focal_length.npy)
+  !! SKIP comparison bed_back_bedroom: no Depth Pro focal length (_focal_length.npy)
+
+======================================================================
+rendered 11 samples, 1 comparisons
+  SKIPPED: bed_back_bedroom: no Depth Pro focal length (_focal_length.npy)
+  SKIPPED: bed_back_bedroom: no Depth Pro focal length (_focal_length.npy)
+  SKIPPED: bed_back_bedroom: no Depth Pro focal length (_focal_length.npy)
+  SKIPPED: bed_back_bedroom: no Depth Pro focal length (_focal_length.npy)
+  SKIPPED: bed_back_bedroom: no Depth Pro focal length (_focal_length.npy)
+======================================================================
