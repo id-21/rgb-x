@@ -203,7 +203,15 @@ def _build_scene_dict(name, geo, repo_root):
 
 
 def _build_maps_png(geo):
-    """Pack region id (R), shading (G), alpha (B) -- see SCHEMA.md."""
+    """
+    Pack region id (R) and alpha (B), 8-bit -- see SCHEMA.md.
+
+    Shading is NOT packed here. P3-T3 measured 8-bit shading quantisation
+    causing a max composited-render delta of up to 3/255 in the smooth wall
+    interior (encoding_budget.json), over the plan's 2/255 banding gate --
+    so shading ships as its own 16-bit PNG (shading.png) instead of this
+    file's G channel. G is left at 0, reserved.
+    """
     H, W = geo["H"], geo["W"]
     n_regions = len(geo["regions"])
     if n_regions > 254:
@@ -211,14 +219,18 @@ def _build_maps_png(geo):
     out = np.zeros((H, W, 3), np.uint8)
     region_ids = geo["region_labels"]
     out[..., 2] = np.where(region_ids >= 0, region_ids + 1, 0).astype(np.uint8)  # R (BGR: idx2)
-    sh = np.clip(geo["shading"], 0, SHADING_SCALE) / SHADING_SCALE
-    out[..., 1] = np.round(sh * 255).astype(np.uint8)                            # G
     out[..., 0] = np.round(np.clip(geo["alpha"], 0, 1) * 255).astype(np.uint8)   # B (BGR: idx0)
     return out
 
 
+def _build_shading_png(geo):
+    """16-bit single-channel shading map. Decode: shading = (v/65535)*scale."""
+    sh = np.clip(geo["shading"], 0, SHADING_SCALE) / SHADING_SCALE
+    return np.round(sh * 65535).astype(np.uint16)
+
+
 def emit_scene(sample_name, out_dir, max_width=None):
-    """Run the pipeline and write scene.json + maps.png + photo.jpg."""
+    """Run the pipeline and write scene.json + maps.png + shading.png + photo.jpg."""
     repo_root = Path(__file__).resolve().parent.parent.parent
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -226,9 +238,11 @@ def emit_scene(sample_name, out_dir, max_width=None):
     geo = _load_geometry(sample_name, max_width)
     scene = _build_scene_dict(sample_name, geo, repo_root)
     maps_bgr = _build_maps_png(geo)
+    shading16 = _build_shading_png(geo)
 
     (out_dir / "scene.json").write_text(json.dumps(scene, indent=2) + "\n")
     cv2.imwrite(str(out_dir / "maps.png"), maps_bgr, [cv2.IMWRITE_PNG_COMPRESSION, 6])
+    cv2.imwrite(str(out_dir / "shading.png"), shading16, [cv2.IMWRITE_PNG_COMPRESSION, 6])
     cv2.imwrite(str(out_dir / "photo.jpg"),
                 cv2.cvtColor(geo["rgb"], cv2.COLOR_RGB2BGR),
                 [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])

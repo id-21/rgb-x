@@ -10,28 +10,38 @@ the conventions below are asserted by test (`scene/tests/test_schema.py`,
 ## The bundle
 
 ```
-scene.json      ~2-6 KB   camera, planes, regions, quality
-maps.png        ~40-80 KB R = region id, G = shading, B = alpha
+scene.json      ~2-6 KB    camera, planes, regions, quality
+maps.png        ~30-60 KB  8-bit: R = region id, G = unused/reserved, B = alpha
+shading.png     ~50-100 KB 16-bit single-channel: shading
 photo.jpg       ~200-400 KB the source image, possibly downscaled
 ```
 
-A consumer holding only these three files — no `.npy`, no depth, no normals,
+A consumer holding only these four files — no `.npy`, no depth, no normals,
 no access to the pipeline — must be able to reproduce the render. That claim
 is what `consume.py` (P3-T5) exists to prove.
 
-## `maps.png` channel packing
+Shading was originally packed as `maps.png`'s G channel (8-bit). P3-T3
+measured that this causes visible banding in the composited render (see
+"Encoding budget" below) and split it out into its own 16-bit PNG instead.
+
+## `maps.png` channel packing (8-bit)
 
 | channel | contents | encoding |
 |---|---|---|
 | R | region id | `id + 1`, so 0 means "no region". Max 254 regions. |
-| G | shading | `round(clip(shading, 0, scale) / scale * 255)`, decode: `shading = (G/255) * scale` |
+| G | unused | reserved, always 0 |
 | B | alpha | feathered wall mask, `round(alpha * 255)` |
 
-`scale` is `scene.json.shading.scale` (default 1.6, matching
-`render.shading_from_irradiance`'s clip ceiling). Written with
-`cv2.IMWRITE_PNG_COMPRESSION=6`; PNG is lossless, which matters — a lossy
-region-id channel would be nonsense (ids would bleed into each other at
-region boundaries).
+## `shading.png` (16-bit single channel)
+
+`round(clip(shading, 0, scale) / scale * 65535)`, decode:
+`shading = (v / 65535) * scale`. `scale` is `scene.json.shading.scale`
+(default 1.6, matching `render.shading_from_irradiance`'s clip ceiling).
+
+Both PNGs are written with `cv2.IMWRITE_PNG_COMPRESSION=6`; PNG is lossless,
+which matters — a lossy region-id channel would be nonsense (ids would bleed
+into each other at region boundaries), and 8-bit-quantised-then-recompressed
+shading would reintroduce the banding 16 bits was chosen to avoid.
 
 ## Decisions, and why they are not to be re-litigated later
 
@@ -114,11 +124,34 @@ what JSON Schema can express:
   not by the schema (a single-sample structural invariant, not a type
   constraint).
 
-## Encoding budget (P3-T3 decision — filled in once measured)
+## Encoding budget (P3-T3 decision)
 
-- 8-bit vs 16-bit shading: **TBD, see `scene/experiments/encoding_budget.py`
-  output.**
-- Chosen JPEG quality for `photo.jpg`: **TBD.**
+Measured by `scene/experiments/encoding_budget.py` across all 12 samples,
+output archived in `scene/experiments/encoding_budget.json`.
+
+- **Shading: 16-bit.** 8-bit shading (step size `1.6/255 = 0.0063`) gives a
+  final-render delta of up to **3/255** (worst case: `bed_back_bedroom`,
+  `fluted_walls_living`), measured in the smooth wall interior
+  (`alpha > 0.99`, to exclude unrelated feather-edge blending) — over the
+  plan's 2/255 banding gate. PSNR stayed high (56.7–57.7 dB across samples)
+  but the plan's gate is about visible banding, not aggregate PSNR, so the
+  8-bit option was rejected. 16-bit round-trips with max error ~1.5e-5,
+  eliminating banding. `maps.png`'s G channel is unused as a result; shading
+  moved to its own `shading.png` (16-bit single-channel PNG).
+- **JPEG quality: 92.** Lowest of {100, 95, 92, 85} clearing PSNR ≥ 40 dB on
+  every sample (worst case 40.4 dB, at quality 92). Quality 85 dropped below
+  the gate on at least one sample.
+- **Median bundle size at these settings: ~1.75 MB**, measured emitting at
+  native/`MAXPIXELS`-capped resolution (no `max_width` downscaling applied).
+  This is well over the "well under 1 MB" aspiration in the phase plan's
+  Definition of Done — almost entirely `photo.jpg` at full working
+  resolution. Deliberately **not resolved here**: choosing a specific
+  `max_width` for bundles served to a browser is a web-service/Phase-4
+  concern (see "Out of scope for Phase 3"), not a pipeline encoding
+  question — this task's job was to measure precision loss per format, not
+  pick a target resolution. Whoever builds the server should re-run
+  `encoding_budget.py`'s JPEG-quality measurement at whatever `max_width` it
+  settles on, since PSNR at a given quality changes with resolution.
 
 ## Sub-schemas / non-goals
 

@@ -1,0 +1,539 @@
+{
+  "samples": [
+    {
+      "sample": "bed_back_bedroom",
+      "image_size": [
+        1200,
+        700
+      ],
+      "shading_precision": {
+        "8bit": {
+          "max_err": 0.00313723087310791,
+          "rms_err": 0.0018255386967211962,
+          "distinct_levels_used": 162,
+          "levels_available": 256
+        },
+        "16bit": {
+          "max_err": 1.2278556823730469e-05,
+          "rms_err": 7.075692792568589e-06,
+          "distinct_levels_used": 29478,
+          "levels_available": 65536
+        }
+      },
+      "render_delta_8bit_vs_float": {
+        "psnr_db": 56.71268310070445,
+        "max_channel_delta": 3
+      },
+      "jpeg": {
+        "100": {
+          "size_kb": 407.3291015625,
+          "psnr_db": 49.111159127678064
+        },
+        "95": {
+          "size_kb": 245.0859375,
+          "psnr_db": 47.54500403432287
+        },
+        "92": {
+          "size_kb": 199.31640625,
+          "psnr_db": 47.238173015556185
+        },
+        "85": {
+          "size_kb": 144.9384765625,
+          "psnr_db": 45.562360986467716
+        }
+      },
+      "maps_png_kb": 353.3544921875
+    },
+    {
+      "sample": "complex_living",
+      "image_size": [
+        2560,
+        1706
+      ],
+      "shading_precision": {
+        "8bit": {
+          "max_err": 0.00313723087310791,
+          "rms_err": 0.001813260605558753,
+          "distinct_levels_used": 124,
+          "levels_available": 256
+        },
+        "16bit": {
+          "max_err": 1.2278556823730469e-05,
+          "rms_err": 7.0498231252713595e-06,
+          "distinct_levels_used": 26953,
+          "levels_available": 65536
+        }
+      },
+      "render_delta_8bit_vs_float": {
+        "psnr_db": 57.28147400460182,
+        "max_channel_delta": 1
+      },
+      "jpeg": {
+        "100": {
+          "size_kb": 2261.5458984375,
+          "psnr_db": 45.18650860429115
+        },
+        "95": {
+          "size_kb": 1240.466796875,
+          "psnr_db": 42.82787471939652
+        },
+        "92": {
+          "size_kb": 936.5478515625,
+          "psnr_db": 41.51326023725331
+        },
+        "85": {
+          "size_kb": 774.8955078125,
+          "psnr_db": 39.152069608163316
+        }
+      },
+      "maps_png_kb": 1302.318359375
+    },
+    {
+      "sample": "fluted_walls_living",
+      "image_size": [
+        1500,
+        1300
+      ],
+      "shading_precision": {
+        "8bit": {
+          "max_err": 0.003137350082397461,
+          "rms_err": 0.0018150417599827051,
+          "distinct_levels_used": 209,
+          "levels_available": 256
+        },
+        "16bit": {
+          "max_err": 1.2278556823730469e-05,
+          "rms_err": 7.050431122479495e-06,
+          "distinct_levels_used": 31158,
+          "levels_available": 65536
+        }
+      },
+      "render_delta_8bit_vs_float": {
+        "psnr_db": 57.390670520404974,
+        "max_channel_delta": 3
+      },
+      "jpeg": {
+        "100": {
+          "size_kb": 1139.0146484375,
+          "psnr_db": 47.22509967793346
+        },
+        "95": {
+          "size_kb": 547.8359375,
+          "psnr_db": 43.178993740647115
+        },
+        "92": {
+          "size_kb": 408.2998046875,
+          "psnr_db": 41.635433911114006
+        },
+        "85": {
+          "size_kb": 290.34375,
+          "psnr_db": 39.43450404489262
+        }
+      },
+      "maps_png_kb": 686.9638671875
+    },
+    {
+      "sample": "living_simple2",
+      "image_size": [
+        1024,
+        682
+      ],
+      "shading_precision": {
+        "8bit": {
+          "max_err": 0.003137350082397461,
+          "rms_err": 0.001817776239477098,
+          "distinct_levels_used": 143,
+          "levels_available": 256
+        },
+        "16bit": {
+          "max_err": 1.2278556823730469e-05,
+          "rms_err": 7.038821422611363e-06,
+          "distinct_levels_used": 24154,
+          "levels_available": 65536
+        }
+      },
+      "render_delta_8bit_vs_float": {
+        "psnr_db": 57.30086578170581,
+        "max_channel_delta": 1
+      },
+      "jpeg": {
+        "100": {
+          "size_kb": 391.1474609375,
+          "psnr_db": 49.09943787907059
+        },
+        "95": {
+          "size_kb": 208.0146484375,
+          "psnr_db": 43.91676276294497
+        },
+        "92": {
+          "size_kb": 162.4853515625,
+          "psnr_db": 41.616828901251594
+        },
+        "85": {
+          "size_kb": 120.1044921875,
+          "psnr_db": 38.31990915009527
+        }
+      },
+      "maps_png_kb": 288.3525390625
+    },
+    {
+      "sample": "living_small_walls",
+      "image_size": [
+        3000,
+        2000
+      ],
+      "shading_precision": {
+        "8bit": {
+          "max_err": 0.003137350082397461,
+          "rms_err": 0.0018147564260289073,
+          "distinct_levels_used": 167,
+          "levels_available": 256
+        },
+        "16bit": {
+          "max_err": 1.2278556823730469e-05,
+          "rms_err": 7.046046903269598e-06,
+          "distinct_levels_used": 23082,
+          "levels_available": 65536
+        }
+      },
+      "render_delta_8bit_vs_float": {
+        "psnr_db": 57.439101622084266,
+        "max_channel_delta": 1
+      },
+      "jpeg": {
+        "100": {
+          "size_kb": 1750.9208984375,
+          "psnr_db": 58.690892898978724
+        },
+        "95": {
+          "size_kb": 1095.1201171875,
+          "psnr_db": 54.448359465248814
+        },
+        "92": {
+          "size_kb": 888.087890625,
+          "psnr_db": 53.41223733553426
+        },
+        "85": {
+          "size_kb": 668.6650390625,
+          "psnr_db": 49.01327699903299
+        }
+      },
+      "maps_png_kb": 1171.767578125
+    },
+    {
+      "sample": "no_walls_living",
+      "image_size": [
+        3873,
+        2582
+      ],
+      "shading_precision": {
+        "8bit": {
+          "max_err": 0.003137350082397461,
+          "rms_err": 0.0018084798939526081,
+          "distinct_levels_used": 206,
+          "levels_available": 256
+        },
+        "16bit": {
+          "max_err": 1.2278556823730469e-05,
+          "rms_err": 7.047359304124257e-06,
+          "distinct_levels_used": 36304,
+          "levels_available": 65536
+        }
+      },
+      "render_delta_8bit_vs_float": {
+        "psnr_db": 57.72702342706638,
+        "max_channel_delta": 2
+      },
+      "jpeg": {
+        "100": {
+          "size_kb": 5468.421875,
+          "psnr_db": 51.789260301082045
+        },
+        "95": {
+          "size_kb": 2957.8935546875,
+          "psnr_db": 44.24187901448843
+        },
+        "92": {
+          "size_kb": 2278.021484375,
+          "psnr_db": 41.80412614605125
+        },
+        "85": {
+          "size_kb": 1619.1015625,
+          "psnr_db": 38.81289838206362
+        }
+      },
+      "maps_png_kb": 1918.2275390625
+    },
+    {
+      "sample": "obstacle_course_living",
+      "image_size": [
+        1280,
+        720
+      ],
+      "shading_precision": {
+        "8bit": {
+          "max_err": 0.003137350082397461,
+          "rms_err": 0.001816238509491086,
+          "distinct_levels_used": 184,
+          "levels_available": 256
+        },
+        "16bit": {
+          "max_err": 1.2278556823730469e-05,
+          "rms_err": 7.052940873109037e-06,
+          "distinct_levels_used": 27149,
+          "levels_available": 65536
+        }
+      },
+      "render_delta_8bit_vs_float": {
+        "psnr_db": 57.36915374339418,
+        "max_channel_delta": 1
+      },
+      "jpeg": {
+        "100": {
+          "size_kb": 614.08984375,
+          "psnr_db": 47.727117578611306
+        },
+        "95": {
+          "size_kb": 336.4677734375,
+          "psnr_db": 42.92991768605155
+        },
+        "92": {
+          "size_kb": 264.9912109375,
+          "psnr_db": 40.44456656618928
+        },
+        "85": {
+          "size_kb": 197.9052734375,
+          "psnr_db": 37.076333699314
+        }
+      },
+      "maps_png_kb": 418.34765625
+    },
+    {
+      "sample": "perspective_living",
+      "image_size": [
+        2560,
+        1707
+      ],
+      "shading_precision": {
+        "8bit": {
+          "max_err": 0.003137350082397461,
+          "rms_err": 0.001823729369789362,
+          "distinct_levels_used": 145,
+          "levels_available": 256
+        },
+        "16bit": {
+          "max_err": 1.2278556823730469e-05,
+          "rms_err": 7.0447445068566594e-06,
+          "distinct_levels_used": 24533,
+          "levels_available": 65536
+        }
+      },
+      "render_delta_8bit_vs_float": {
+        "psnr_db": 57.60008707943623,
+        "max_channel_delta": 1
+      },
+      "jpeg": {
+        "100": {
+          "size_kb": 1299.3974609375,
+          "psnr_db": 54.363578172384905
+        },
+        "95": {
+          "size_kb": 825.8466796875,
+          "psnr_db": 52.0812985698987
+        },
+        "92": {
+          "size_kb": 673.9208984375,
+          "psnr_db": 51.58481795240362
+        },
+        "85": {
+          "size_kb": 507.8203125,
+          "psnr_db": 48.51767873638402
+        }
+      },
+      "maps_png_kb": 1090.7470703125
+    },
+    {
+      "sample": "room1",
+      "image_size": [
+        2582,
+        3873
+      ],
+      "shading_precision": {
+        "8bit": {
+          "max_err": 0.003137350082397461,
+          "rms_err": 0.001808824366889894,
+          "distinct_levels_used": 130,
+          "levels_available": 256
+        },
+        "16bit": {
+          "max_err": 1.2278556823730469e-05,
+          "rms_err": 7.050612566672498e-06,
+          "distinct_levels_used": 29786,
+          "levels_available": 65536
+        }
+      },
+      "render_delta_8bit_vs_float": {
+        "psnr_db": 57.32398591149995,
+        "max_channel_delta": 1
+      },
+      "jpeg": {
+        "100": {
+          "size_kb": 4457.1640625,
+          "psnr_db": 53.37289269753285
+        },
+        "95": {
+          "size_kb": 2351.650390625,
+          "psnr_db": 47.17924732659198
+        },
+        "92": {
+          "size_kb": 1786.1630859375,
+          "psnr_db": 45.191105257234895
+        },
+        "85": {
+          "size_kb": 1300.740234375,
+          "psnr_db": 42.53552641448482
+        }
+      },
+      "maps_png_kb": 2533.759765625
+    },
+    {
+      "sample": "simple_living",
+      "image_size": [
+        3400,
+        2216
+      ],
+      "shading_precision": {
+        "8bit": {
+          "max_err": 0.003137350082397461,
+          "rms_err": 0.0018125158967450261,
+          "distinct_levels_used": 125,
+          "levels_available": 256
+        },
+        "16bit": {
+          "max_err": 1.2278556823730469e-05,
+          "rms_err": 7.049703526718076e-06,
+          "distinct_levels_used": 27814,
+          "levels_available": 65536
+        }
+      },
+      "render_delta_8bit_vs_float": {
+        "psnr_db": 57.46116468219638,
+        "max_channel_delta": 1
+      },
+      "jpeg": {
+        "100": {
+          "size_kb": 2208.2626953125,
+          "psnr_db": 52.1708948379399
+        },
+        "95": {
+          "size_kb": 1316.615234375,
+          "psnr_db": 51.09868546787882
+        },
+        "92": {
+          "size_kb": 1037.287109375,
+          "psnr_db": 50.49726976452896
+        },
+        "85": {
+          "size_kb": 886.8046875,
+          "psnr_db": 47.805048707635905
+        }
+      },
+      "maps_png_kb": 1595.365234375
+    },
+    {
+      "sample": "simple_living_2",
+      "image_size": [
+        3000,
+        1688
+      ],
+      "shading_precision": {
+        "8bit": {
+          "max_err": 0.003137350082397461,
+          "rms_err": 0.0018111391691491008,
+          "distinct_levels_used": 182,
+          "levels_available": 256
+        },
+        "16bit": {
+          "max_err": 1.2278556823730469e-05,
+          "rms_err": 7.0467267505591735e-06,
+          "distinct_levels_used": 39163,
+          "levels_available": 65536
+        }
+      },
+      "render_delta_8bit_vs_float": {
+        "psnr_db": 57.08514892209113,
+        "max_channel_delta": 1
+      },
+      "jpeg": {
+        "100": {
+          "size_kb": 1363.4482421875,
+          "psnr_db": 56.124781082012376
+        },
+        "95": {
+          "size_kb": 817.6591796875,
+          "psnr_db": 54.054954881860546
+        },
+        "92": {
+          "size_kb": 664.44921875,
+          "psnr_db": 53.50413038182596
+        },
+        "85": {
+          "size_kb": 508.478515625,
+          "psnr_db": 49.70285509387628
+        }
+      },
+      "maps_png_kb": 1131.556640625
+    },
+    {
+      "sample": "simple_living_3",
+      "image_size": [
+        1400,
+        933
+      ],
+      "shading_precision": {
+        "8bit": {
+          "max_err": 0.0031372904777526855,
+          "rms_err": 0.0018120382446795702,
+          "distinct_levels_used": 146,
+          "levels_available": 256
+        },
+        "16bit": {
+          "max_err": 1.2278556823730469e-05,
+          "rms_err": 7.040295713522937e-06,
+          "distinct_levels_used": 29737,
+          "levels_available": 65536
+        }
+      },
+      "render_delta_8bit_vs_float": {
+        "psnr_db": 57.31727364267449,
+        "max_channel_delta": 1
+      },
+      "jpeg": {
+        "100": {
+          "size_kb": 704.87890625,
+          "psnr_db": 47.003263814680416
+        },
+        "95": {
+          "size_kb": 369.060546875,
+          "psnr_db": 43.311749479391096
+        },
+        "92": {
+          "size_kb": 285.2021484375,
+          "psnr_db": 41.4006896019383
+        },
+        "85": {
+          "size_kb": 210.9833984375,
+          "psnr_db": 38.251572128624616
+        }
+      },
+      "maps_png_kb": 452.5009765625
+    }
+  ],
+  "decision": {
+    "chosen_shading_bits": 16,
+    "max_render_delta_8bit": 3,
+    "chosen_jpeg_quality": 92,
+    "chosen_jpeg_psnr_db": 40.44456656618928,
+    "median_bundle_kb_at_chosen_settings": 1783.3369140625
+  }
+}

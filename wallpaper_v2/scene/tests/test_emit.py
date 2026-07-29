@@ -67,6 +67,10 @@ def test_all_samples_emit_valid_bundles():
             assert r_ids == expected, \
                 f"{name}: maps.png R channel {sorted(r_ids)} != expected {sorted(expected)}"
 
+            shading16 = cv2.imread(str(out / "shading.png"), cv2.IMREAD_UNCHANGED)
+            assert shading16 is not None and shading16.dtype == np.uint16, \
+                f"{name}: shading.png missing or not 16-bit"
+
             emitted.append(name)
             print(f"  ok: {name} -- {len(plane_ids)} planes, {len(scene['regions'])} regions, "
                   f"schema-valid")
