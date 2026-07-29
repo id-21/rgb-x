@@ -4,3 +4,9 @@ __pycache__/
 *.pyc
 model_cache*/
 normal_irradiance/example/
+*.png
+*.jpg
+*.jpeg
+wallpaper_v2/outputs/
+normal_irradiance/venv/
+Notebook for Output visualisation/venv_notebook/

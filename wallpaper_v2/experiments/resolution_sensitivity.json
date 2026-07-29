@@ -1,0 +1,222 @@
+[
+  {
+    "sample": "complex_living",
+    "native": "2560x1706",
+    "small": "768x512",
+    "scale": 0.3,
+    "n_native": 4,
+    "n_small": 4,
+    "lost": 0,
+    "max_angle": 0.36153605580329895,
+    "max_dd": 0.0108500281312649,
+    "max_ddp": 0.2219307524562088,
+    "gravity_shift": 0.20358121272063778,
+    "smallest_share": 0.06168772807962671,
+    "irr": {
+      "rms_all": 0.0043229167349636555,
+      "rms_smooth": 0.000544866023119539,
+      "rms_edges": 0.01194709911942482,
+      "dynamic_range": 0.42510122060775757
+    }
+  },
+  {
+    "sample": "fluted_walls_living",
+    "native": "1500x1300",
+    "small": "768x666",
+    "scale": 0.512,
+    "n_native": 2,
+    "n_small": 2,
+    "lost": 0,
+    "max_angle": 0.05934702232480049,
+    "max_dd": 0.0019521891302742844,
+    "max_ddp": 0.031904962140440744,
+    "gravity_shift": 0.03483637663898787,
+    "smallest_share": 0.09577948034643571,
+    "irr": {
+      "rms_all": 0.003809957532212138,
+      "rms_smooth": 0.000624806503765285,
+      "rms_edges": 0.009639469906687737,
+      "dynamic_range": 0.4126981496810913
+    }
+  },
+  {
+    "sample": "living_simple2",
+    "native": "1024x682",
+    "small": "768x512",
+    "scale": 0.75,
+    "n_native": 3,
+    "n_small": 3,
+    "lost": 0,
+    "max_angle": 0.33279094099998474,
+    "max_dd": 0.017637198770271922,
+    "max_ddp": 0.42700917306064395,
+    "gravity_shift": 0.059058290958144376,
+    "smallest_share": 0.11551549482127721,
+    "irr": {
+      "rms_all": 0.0031326005700975657,
+      "rms_smooth": 0.00034051266266033053,
+      "rms_edges": 0.008104139007627964,
+      "dynamic_range": 0.4349820613861084
+    }
+  },
+  {
+    "sample": "living_small_walls",
+    "native": "3000x2000",
+    "small": "768x512",
+    "scale": 0.256,
+    "n_native": 2,
+    "n_small": 2,
+    "lost": 0,
+    "max_angle": 0.13705609738826752,
+    "max_dd": 0.010250174869983475,
+    "max_ddp": 0.495022886633178,
+    "gravity_shift": 0.06354832287362046,
+    "smallest_share": 0.1799328595587051,
+    "irr": {
+      "rms_all": 0.003975358791649342,
+      "rms_smooth": 0.0005476990481838584,
+      "rms_edges": 0.0108012855052948,
+      "dynamic_range": 0.3671115040779114
+    }
+  },
+  {
+    "sample": "no_walls_living",
+    "native": "4380x2920",
+    "small": "768x512",
+    "scale": 0.17534246575342466,
+    "n_native": 2,
+    "n_small": 2,
+    "lost": 0,
+    "max_angle": 0.05595290660858154,
+    "max_dd": 0.003920714976450412,
+    "max_ddp": 0.05750898696144693,
+    "gravity_shift": 0.013093593668217792,
+    "smallest_share": 0.41082732393310245,
+    "irr": {
+      "rms_all": 0.0045761773362755775,
+      "rms_smooth": 0.0011169384233653545,
+      "rms_edges": 0.01243059616535902,
+      "dynamic_range": 0.48294728994369507
+    }
+  },
+  {
+    "sample": "obstacle_course_living",
+    "native": "1280x720",
+    "small": "768x432",
+    "scale": 0.6,
+    "n_native": 4,
+    "n_small": 4,
+    "lost": 1,
+    "max_angle": 0.11190582811832428,
+    "max_dd": 0.0032636333869286993,
+    "max_ddp": 0.13924370604684075,
+    "gravity_shift": 0.05145848754764844,
+    "smallest_share": 0.025849592173317924,
+    "irr": {
+      "rms_all": 0.005842709448188543,
+      "rms_smooth": 0.0007922854856587946,
+      "rms_edges": 0.01378900557756424,
+      "dynamic_range": 0.46631595492362976
+    }
+  },
+  {
+    "sample": "perspective_living",
+    "native": "2560x1707",
+    "small": "768x512",
+    "scale": 0.3,
+    "n_native": 4,
+    "n_small": 4,
+    "lost": 0,
+    "max_angle": 0.3403487205505371,
+    "max_dd": 0.02153276047645447,
+    "max_ddp": 2.1372643969020997,
+    "gravity_shift": 0.08257694515040409,
+    "smallest_share": 0.05030816808942013,
+    "irr": {
+      "rms_all": 0.004133287817239761,
+      "rms_smooth": 0.000465504388557747,
+      "rms_edges": 0.010954693891108036,
+      "dynamic_range": 0.2885233163833618
+    }
+  },
+  {
+    "sample": "room1",
+    "native": "3000x4500",
+    "small": "512x768",
+    "scale": 0.17066666666666666,
+    "n_native": 1,
+    "n_small": 1,
+    "lost": 0,
+    "max_angle": 0.34149664640426636,
+    "max_dd": 0.0039180685401869475,
+    "max_ddp": 0.10468293210531338,
+    "gravity_shift": 0.07335415984104451,
+    "smallest_share": 0.9917804950171456,
+    "irr": {
+      "rms_all": 0.0020992227364331484,
+      "rms_smooth": 0.0003530196554493159,
+      "rms_edges": 0.006112772971391678,
+      "dynamic_range": 0.3735237717628479
+    }
+  },
+  {
+    "sample": "simple_living",
+    "native": "3400x2216",
+    "small": "768x501",
+    "scale": 0.22588235294117648,
+    "n_native": 3,
+    "n_small": 3,
+    "lost": 0,
+    "max_angle": 0.7173702716827393,
+    "max_dd": 0.03145561364349181,
+    "max_ddp": 1.5138717990875938,
+    "gravity_shift": 0.024789662548047348,
+    "smallest_share": 0.02300816826667222,
+    "irr": {
+      "rms_all": 0.0018849143525585532,
+      "rms_smooth": 0.0005574262468144298,
+      "rms_edges": 0.005011880304664373,
+      "dynamic_range": 0.3988564610481262
+    }
+  },
+  {
+    "sample": "simple_living_2",
+    "native": "3000x1688",
+    "small": "768x432",
+    "scale": 0.256,
+    "n_native": 2,
+    "n_small": 2,
+    "lost": 0,
+    "max_angle": 0.16432450711727142,
+    "max_dd": 0.010954792468393482,
+    "max_ddp": 0.3646082232974573,
+    "gravity_shift": 0.06745149357353546,
+    "smallest_share": 0.18753633777418502,
+    "irr": {
+      "rms_all": 0.005538892932236195,
+      "rms_smooth": 0.0007590441964566708,
+      "rms_edges": 0.014182690531015396,
+      "dynamic_range": 0.7640237212181091
+    }
+  },
+  {
+    "sample": "simple_living_3",
+    "native": "1400x933",
+    "small": "768x512",
+    "scale": 0.5485714285714286,
+    "n_native": 3,
+    "n_small": 3,
+    "lost": 0,
+    "max_angle": 0.1724584996700287,
+    "max_dd": 0.012723935618024207,
+    "max_ddp": 0.46643275041062887,
+    "gravity_shift": 0.03279559002223915,
+    "smallest_share": 0.04837408875958979,
+    "irr": {
+      "rms_all": 0.002757244510576129,
+      "rms_smooth": 0.0003613686130847782,
+      "rms_edges": 0.007926198653876781,
+      "dynamic_range": 0.4202517867088318
+    }
+  }
+]
