@@ -4,10 +4,14 @@ import hashlib
 import sys
 from pathlib import Path
 
+import cv2
+import numpy as np
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "experiments"))
 
-from run_all import BATCH, OUT, run_isolated  # noqa: E402
+from run_all import BATCH, OUT, run_isolated, find_inputs, fit_scale  # noqa: E402
+from geometry import load_normals, WALL_CONF_T  # noqa: E402
 
 BASELINE_DIR = OUT / "baseline"
 TEXTURE = BATCH / "30106.jpg"
@@ -22,6 +26,36 @@ REQUIRED_KEYS = {
 
 def all_samples():
     return sorted(p.name for p in BATCH.iterdir() if p.is_dir())
+
+
+def load_geometry_inputs(name):
+    """
+    Load and resample one sample's normals/mask/depth exactly as
+    run_all.process() does, without running the rest of the pipeline. Used by
+    tests that need direct access to intermediate arrays. Returns None if the
+    sample is missing depth/focal, or dict(normals, mask, depth, f, cx, cy, scale).
+    """
+    g = find_inputs(name)
+    if g is None or g["depth"] is None or g["focal"] is None:
+        return None
+    normals, _ = load_normals(g["normal"], verbose=False)
+    normals = normals.astype(np.float32)
+    conf = np.load(g["conf"])
+    depth = np.load(g["depth"]).astype(np.float32)
+    f_full = float(np.load(g["focal"]))
+
+    s = fit_scale(depth.shape)
+    if s < 1.0:
+        H2, W2 = int(round(depth.shape[0] * s)), int(round(depth.shape[1] * s))
+        normals = cv2.resize(normals, (W2, H2), interpolation=cv2.INTER_NEAREST)
+        normals /= (np.linalg.norm(normals, axis=-1, keepdims=True) + 1e-12)
+        conf = cv2.resize(conf, (W2, H2), interpolation=cv2.INTER_AREA)
+        depth = cv2.resize(depth, (W2, H2), interpolation=cv2.INTER_NEAREST)
+    H, W = depth.shape
+    f = f_full * s
+    cx, cy = W / 2.0, H / 2.0
+    mask = conf > WALL_CONF_T
+    return dict(normals=normals, mask=mask, depth=depth, f=f, cx=cx, cy=cy, scale=s)
 
 
 def render_one(name):

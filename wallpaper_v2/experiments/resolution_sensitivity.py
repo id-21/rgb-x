@@ -66,8 +66,9 @@ def geometry_at(normals, conf, depth, f, scale):
         return None
     grav, _, tilt, amb = estimate_gravity(normals, mask)
     labels = cluster_planes(normals, mask, depth=depth, fx=f, cx=cx, cy=cy,
-                            n_clusters=8, top_n=4)
-    planes = fit_planes(labels, normals, depth=depth, fx=f, cx=cx, cy=cy)
+                            n_clusters=8, scale=scale)
+    planes = fit_planes(labels, normals, depth=depth, fx=f, cx=cx, cy=cy,
+                        wall_px=int(mask.sum()))
     _, info = compute_uv(labels, planes, grav, f, cx, cy)
     return dict(
         gravity=grav, tilt=tilt,

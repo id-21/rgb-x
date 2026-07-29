@@ -123,8 +123,8 @@ def estimate_gravity(normals, mask, prior_weight=0.05):
 # ---------------------------------------------------------------------------
 
 def cluster_planes(normals, mask, depth=None, fx=None, cx=None, cy=None,
-                   n_clusters=8, top_n=4, min_frac=0.02, merge_deg=12.0,
-                   random_state=42):
+                   n_clusters=8, min_frac=0.005, merge_deg=12.0,
+                   random_state=42, min_px=1500, scale=1.0):
     """
     Cluster wall pixels into planes.
 
@@ -140,6 +140,24 @@ def cluster_planes(normals, mask, depth=None, fx=None, cx=None, cy=None,
     k-means' arbitrary cluster-label order. IDs are only stable for a given
     input; they are not global identifiers across different photos. See
     `_order_kept_planes` for the ordering.
+
+    RETENTION: every candidate cluster that covers at least `min_frac` of
+    wall pixels OR at least `min_px` pixels (whichever is larger) is kept --
+    there is no separate count cap. A count cap and a size floor do the same
+    job (deciding which planes are "real"), and the floor is where that
+    quality judgement should live: capping by count makes retention depend on
+    how many planes a scene happens to contain, and silently discards planes
+    that already cleared the floor (measured on complex_living, T3: 11 of 12
+    candidates cleared the floor, an 8-plane cap dropped 3 of them). If a
+    downstream consumer needs a hard limit (e.g. a client-side texture-array
+    size), apply it explicitly at that point, not here.
+
+    `min_px` is specified at NATIVE resolution and scaled by `scale` (the
+    caller's working-resolution factor, e.g. from run_all.fit_scale) so the
+    same physical surface is retained regardless of what size the image was
+    processed at. No fallback assigns leftover pixels to the nearest plane:
+    a pixel that doesn't belong to a kept plane stays -1 and shows up in
+    wall_coverage rather than being papered over.
 
     Returns labels (H,W) int32 with -1 = not a wall.
     """
@@ -185,10 +203,10 @@ def cluster_planes(normals, mask, depth=None, fx=None, cx=None, cy=None,
     if depth is not None:
         labels = _split_by_offset(labels, depth, normals, fx, cx, cy)
 
-    # ---- keep the largest planes only ----
+    # ---- keep every plane clearing the size floor -- no count cap ----
     counts = {l: int((labels == l).sum()) for l in np.unique(labels) if l >= 0}
-    keep = [l for l, c in sorted(counts.items(), key=lambda kv: -kv[1])[:top_n]
-            if c >= min_frac * mask.sum()]
+    px_floor = max(min_frac * mask.sum(), min_px * scale ** 2)
+    keep = [l for l, c in counts.items() if c >= px_floor]
 
     ordered = _order_kept_planes(labels, keep, normals, wall_px, depth, fx, cx, cy)
 
@@ -280,7 +298,7 @@ def _split_by_offset(labels, depth, normals, fx, cx, cy, gap_m=0.35):
 
 
 def fit_planes(labels, normals, depth=None, fx=None, cx=None, cy=None,
-               default_distance=3.0):
+               default_distance=3.0, wall_px=None):
     """
     Fit (n, d) per plane, so that the plane is  n . X = d  with d > 0.
 
@@ -288,12 +306,34 @@ def fit_planes(labels, normals, depth=None, fx=None, cx=None, cy=None,
     trimmed) -- this is the metric case.
     Without depth: the normal is still exact, and d is set later by the caller
     (perspective-only mode), defaulting to `default_distance` metres.
+
+    Each plane also gets a `confidence` in [0, 1], the mean of:
+      - px_share         : fraction of wall pixels this plane covers, capped
+                            at 1.0 (relative to `wall_px`, the pre-retention
+                            wall pixel count; pass it explicitly if it should
+                            differ from (labels >= 0).sum())
+      - normal_tightness : mean cosine similarity of member normals to the
+                            plane's own mean normal -- a noisy or curved
+                            surface (or a k-means cluster straddling two
+                            surfaces) scores low here
+      - depth_agreement  : 1 - model_vs_depth_normal_deg / 90, clipped to
+                            [0, 1] -- large disagreement flags glass, mirror
+                            or TV-screen suspects (only available with depth)
+    This is meant for the UI to rank planes, not for the pipeline to filter
+    them -- retention is decided in cluster_planes.
     """
+    if wall_px is None:
+        wall_px = int((labels >= 0).sum())
+
     planes = {}
     for l in [x for x in np.unique(labels) if x >= 0]:
         sel = labels == l
-        n = normals[sel].mean(0)
+        member = normals[sel]
+        n = member.mean(0)
         n /= np.linalg.norm(n) + 1e-12
+        npix = int(sel.sum())
+        tightness = float(np.clip(np.mean(member @ n), 0.0, 1.0))
+        components = [min(npix / max(wall_px, 1), 1.0), tightness]
 
         if depth is not None:
             pts = points_for(sel, depth, fx, cx, cy)
@@ -307,15 +347,18 @@ def fit_planes(labels, normals, depth=None, fx=None, cx=None, cy=None,
             n_fit = Vt[-1]
             if n_fit @ n < 0:
                 n_fit = -n_fit
-            ang = np.degrees(np.arccos(np.clip(n_fit @ n, -1, 1)))
+            ang = float(np.degrees(np.arccos(np.clip(n_fit @ n, -1, 1))))
             d = float(np.median(pts @ n))
+            components.append(float(np.clip(1.0 - ang / 90.0, 0.0, 1.0)))
             planes[l] = dict(n=n, d=d, n_model=n, n_depth=n_fit,
-                             disagree_deg=float(ang), metric=True,
-                             npix=int(sel.sum()))
+                             disagree_deg=ang, metric=True, npix=npix,
+                             tightness=tightness,
+                             confidence=float(np.mean(components)))
         else:
             planes[l] = dict(n=n, d=None, n_model=n, n_depth=None,
-                             disagree_deg=None, metric=False,
-                             npix=int(sel.sum()))
+                             disagree_deg=None, metric=False, npix=npix,
+                             tightness=tightness,
+                             confidence=float(np.mean(components)))
 
     # Camera sits at the origin looking down +z; planes must be in front.
     for l, p in planes.items():

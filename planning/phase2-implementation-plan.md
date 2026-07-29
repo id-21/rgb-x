@@ -426,15 +426,61 @@ rather than be papered over.
 
 ### Gate
 
+> **REVISED after the first T3 run.** The original gate assumed any coverage
+> shortfall was a *retention* problem solvable by lowering the floor. Inspecting the
+> uncovered pixels visually — not just counting them — showed that is true for only
+> one of four failing samples. Gating on an outcome that three different subsystems
+> contribute to was the specification error.
+
+**Gate now (mechanism — T3 owns this):**
+
+| metric | gate |
+|---|---|
+| planes discarded by a **count cap** despite clearing the size floor | **0** |
+| planes lost native → 768 px | 0 |
+| every retained plane has `confidence` ∈ [0, 1] | yes |
+| non-Manhattan plane pairs | must not increase by more than 2 across the set |
+
+**Gate deferred (outcome — re-checked after T6):**
+
 | metric | gate |
 |---|---|
 | `wall_coverage`, min across samples | ≥ 0.98 |
-| planes lost native → 768 px | 0 |
-| non-Manhattan plane pairs | must not increase by more than 2 across the set |
 
-That last one is the counterweight: retaining more planes will surface more spurious
-ones. If it blows past +2, the confidence score needs to do more work before this
-lands.
+### What the uncovered pixels actually are
+
+Overlaying uncovered wall pixels on the photos (`outputs/_t3_uncovered.png`):
+
+| sample | coverage | uncovered pixels are… | owner |
+|---|---|---|---|
+| `complex_living` | 0.934 | one genuine missed wall at frame right (39,940 px, 64% of the shortfall) plus edge slivers | **T3** |
+| `no_walls_living` | 0.979 | thin slivers along the ceiling line and window/curtain edges | **T6** |
+| `fluted_walls_living` | 0.982 | vertical stripes *between the flutes* | **T5** |
+| `living_small_walls` | 0.976 | strip at the glass partition, plus far-room walls seen through a doorway | **T6 / scope** |
+
+Only `complex_living` is a retention failure. It has 12 candidate planes, 11 clearing
+the floor, and `top_n=8` truncating three legitimate ones.
+
+**Therefore: remove the `top_n` cap; do NOT lower `min_frac`/`min_px`.**
+
+`top_n` and `min_frac`/`min_px` are two mechanisms doing one job. Every plane the cap
+discards has already passed the size floor, which is where the quality judgement
+lives. A count cap also makes retention depend on how many planes a scene happens to
+contain. If a cap is later needed for client-side texture-array limits, apply it at
+render time, explicitly — not by silently dropping geometry.
+
+Lowering the floor would be the wrong fix for the other three:
+
+- `fluted_walls_living` — flutes are ribbed normals on **one** wall. Admitting each
+  stripe as its own plane is backwards; the right answer is merging, which is T5.
+- `no_walls_living` — boundary slivers are a mask-edge artefact. T6 fixes these by
+  shrinking the denominator, not by admitting more planes.
+- `living_small_walls` — surfaces seen through glass and an open doorway. These
+  arguably should not be in the wall mask at all. Raise as a scope question: does the
+  product wallpaper walls visible in an adjoining room?
+
+Do not lower the floor to turn a number green when the visual evidence says the
+number is measuring three other subsystems.
 
 ### Commit
 
@@ -574,6 +620,12 @@ Three hypotheses, and they need different fixes:
 
 1. **Genuine geometry** — bay windows, angled alcoves, sloped ceilings. `fluted_walls_living`
    is a plausible candidate: fluted walls have ribbed normals by construction.
+   **Confirmed visually during T3**: its uncovered pixels are vertical stripes
+   between the flutes. So the normals are genuinely varying — but the product answer
+   is one plane for that wall, not one per flute. This is a *merge* problem, and it
+   is the case that decides whether `merge_deg = 12°` is the right threshold or
+   whether ribbed surfaces need explicit handling. Do not solve it by admitting more
+   small planes.
 2. **Clustering artifact** — k-means splitting one curved or noisy surface into
    several arbitrary slices. T4's region decomposition would show these as
    spatially interleaved rather than compact.
@@ -707,9 +759,24 @@ which pixels are wall, which shifts plane fits.
 
 - IoU ≥ 0.95 on annotated set, no regression vs baseline
 - boundary F-score @2 px improves by ≥ 0.05 absolute
-- `wall_coverage` stays ≥ 0.98
+- **`wall_coverage` ≥ 0.98** — the outcome gate deferred from T3 lands here
 - no new non-Manhattan plane pairs
 - `verify.py` still reports 0 failures across the set
+
+### Inherited from T3
+
+Two samples' coverage shortfalls were traced to mask quality, not plane retention,
+and should resolve here:
+
+- `no_walls_living` (0.979) — thin uncovered slivers along the ceiling line and
+  window/curtain edges. Classic thresholded-boundary artefact; refinement should
+  remove them.
+- `living_small_walls` (0.976) — uncovered strip at the glass partition, plus walls
+  in the adjoining room seen through a doorway. **This one is a scope question before
+  it is a technical one:** should the product wallpaper a wall visible through a
+  doorway in another room? If no, the fix is excluding them from the mask, and
+  coverage improves by shrinking the denominator. Decide this explicitly rather than
+  letting the segmenter decide it by accident.
 
 ### Commits
 

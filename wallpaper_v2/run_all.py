@@ -143,8 +143,9 @@ def process(name, texture_bgr, tag, save_steps=True):
     # ---- geometry ----
     grav, resid, tilt, grav_ambiguous = estimate_gravity(normals, mask)
     labels = cluster_planes(normals, mask, depth=depth, fx=f, cx=cx, cy=cy,
-                            n_clusters=8, top_n=4)
-    planes = fit_planes(labels, normals, depth=depth, fx=f, cx=cx, cy=cy)
+                            n_clusters=8, scale=s)
+    planes = fit_planes(labels, normals, depth=depth, fx=f, cx=cx, cy=cy,
+                        wall_px=int(mask.sum()))
     if not planes:
         return None, f"{name}: no planes fitted"
     uv, info = compute_uv(labels, planes, grav, f, cx, cy)
@@ -183,6 +184,7 @@ def process(name, texture_bgr, tag, save_steps=True):
             extent_m=[info[l]['width_m'], info[l]['height_m']],
             pattern_repeats_across=float(info[l]['width_m'] / PATTERN_W_M),
             grazing_px_dropped=int(info[l]['degenerate']),
+            confidence=float(p['confidence']),
         ) for l, p in planes.items()},
     )
     print(f"      gravity tilt {tilt:.1f} deg"

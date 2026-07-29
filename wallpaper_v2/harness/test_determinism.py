@@ -11,47 +11,21 @@ Usage:
 import json
 import sys
 
-import cv2
 import numpy as np
 
-from _common import BASELINE_DIR, all_samples
+from _common import BASELINE_DIR, all_samples, load_geometry_inputs
 from compare_to_baseline import compare_one
-from run_all import find_inputs, fit_scale
-from geometry import load_normals, cluster_planes, fit_planes, points_for, WALL_CONF_T
+from geometry import cluster_planes, fit_planes, points_for
 
 SEEDS = [42, 7, 1234]
 ANGLE_TOL_DEG = 1.0
 D_TOL_M = 0.05
 
 
-def _load_geometry_inputs(name):
-    g = find_inputs(name)
-    if g is None or g["depth"] is None or g["focal"] is None:
-        return None
-    normals, _ = load_normals(g["normal"], verbose=False)
-    normals = normals.astype(np.float32)
-    conf = np.load(g["conf"])
-    depth = np.load(g["depth"]).astype(np.float32)
-    f_full = float(np.load(g["focal"]))
-
-    s = fit_scale(depth.shape)
-    if s < 1.0:
-        H2, W2 = int(round(depth.shape[0] * s)), int(round(depth.shape[1] * s))
-        normals = cv2.resize(normals, (W2, H2), interpolation=cv2.INTER_NEAREST)
-        normals /= (np.linalg.norm(normals, axis=-1, keepdims=True) + 1e-12)
-        conf = cv2.resize(conf, (W2, H2), interpolation=cv2.INTER_AREA)
-        depth = cv2.resize(depth, (W2, H2), interpolation=cv2.INTER_NEAREST)
-    H, W = depth.shape
-    f = f_full * s
-    cx, cy = W / 2.0, H / 2.0
-    mask = conf > WALL_CONF_T
-    return dict(normals=normals, mask=mask, depth=depth, f=f, cx=cx, cy=cy)
-
-
 def test_seed_stability():
     stable_count, total, unstable = 0, 0, []
     for name in all_samples():
-        gi = _load_geometry_inputs(name)
+        gi = load_geometry_inputs(name)
         if gi is None:
             continue
         total += 1
@@ -60,7 +34,7 @@ def test_seed_stability():
         for seed in SEEDS:
             labels = cluster_planes(gi["normals"], gi["mask"], depth=gi["depth"],
                                     fx=gi["f"], cx=gi["cx"], cy=gi["cy"],
-                                    n_clusters=8, top_n=4, random_state=seed)
+                                    n_clusters=8, scale=gi["scale"], random_state=seed)
             results[seed] = fit_planes(labels, gi["normals"], depth=gi["depth"],
                                        fx=gi["f"], cx=gi["cx"], cy=gi["cy"])
 
@@ -95,12 +69,12 @@ def test_seed_stability():
 
 def test_near_tie_simulation():
     for name in all_samples():
-        gi = _load_geometry_inputs(name)
+        gi = load_geometry_inputs(name)
         if gi is None:
             continue
         labels = cluster_planes(gi["normals"], gi["mask"], depth=gi["depth"],
                                 fx=gi["f"], cx=gi["cx"], cy=gi["cy"],
-                                n_clusters=8, top_n=4)
+                                n_clusters=8, scale=gi["scale"])
         ids = sorted(int(l) for l in np.unique(labels) if l >= 0)
         wall_px = int(gi["mask"].sum())
 
