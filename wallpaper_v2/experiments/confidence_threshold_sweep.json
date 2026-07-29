@@ -1,0 +1,74 @@
+[
+  {
+    "otsu": 0.4823529411764706,
+    "ambiguous_band_frac": 0.18575357142857143,
+    "area_swing_pct": 14.316883072609272,
+    "sample": "bed_back_bedroom"
+  },
+  {
+    "otsu": 0.47843137254901963,
+    "ambiguous_band_frac": 0.23799137236225087,
+    "area_swing_pct": 26.1690493486934,
+    "sample": "complex_living"
+  },
+  {
+    "otsu": 0.49019607843137253,
+    "ambiguous_band_frac": 0.18051333333333333,
+    "area_swing_pct": 10.719187208527648,
+    "sample": "fluted_walls_living"
+  },
+  {
+    "otsu": 0.49411764705882355,
+    "ambiguous_band_frac": 0.20438937637463342,
+    "area_swing_pct": 7.174546732546361,
+    "sample": "living_simple2"
+  },
+  {
+    "otsu": 0.48627450980392156,
+    "ambiguous_band_frac": 0.2127585,
+    "area_swing_pct": 33.10328253341923,
+    "sample": "living_small_walls"
+  },
+  {
+    "otsu": 0.45098039215686275,
+    "ambiguous_band_frac": 0.3804326953149434,
+    "area_swing_pct": 32.09535687223933,
+    "sample": "no_walls_living"
+  },
+  {
+    "otsu": 0.47058823529411764,
+    "ambiguous_band_frac": 0.408115234375,
+    "area_swing_pct": 35.613497735542815,
+    "sample": "obstacle_course_living"
+  },
+  {
+    "otsu": 0.47843137254901963,
+    "ambiguous_band_frac": 0.2859418479056825,
+    "area_swing_pct": 19.461461081126533,
+    "sample": "perspective_living"
+  },
+  {
+    "otsu": 0.4980392156862745,
+    "ambiguous_band_frac": 0.15318103703703703,
+    "area_swing_pct": 12.637437033424812,
+    "sample": "room1"
+  },
+  {
+    "otsu": 0.4588235294117647,
+    "ambiguous_band_frac": 0.2589368761945211,
+    "area_swing_pct": 26.176946284129926,
+    "sample": "simple_living"
+  },
+  {
+    "otsu": 0.4627450980392157,
+    "ambiguous_band_frac": 0.3716346761453396,
+    "area_swing_pct": 36.0973619164581,
+    "sample": "simple_living_2"
+  },
+  {
+    "otsu": 0.49019607843137253,
+    "ambiguous_band_frac": 0.1320770173020977,
+    "area_swing_pct": 7.252631224235344,
+    "sample": "simple_living_3"
+  }
+]

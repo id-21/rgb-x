@@ -28,7 +28,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from geometry import (load_normals, estimate_gravity, cluster_planes,
-                      fit_planes, compute_uv)
+                      fit_planes, compute_uv, WALL_CONF_T)
 
 ROOT = Path(__file__).resolve().parents[2]
 BATCH = ROOT / "rgb-x_output" / "batch_output"
@@ -61,7 +61,7 @@ def geometry_at(normals, conf, depth, f, scale):
         f = f * scale
     H, W = depth.shape
     cx, cy = W / 2.0, H / 2.0
-    mask = conf > 0.5
+    mask = conf > WALL_CONF_T
     if mask.sum() < 0.01 * mask.size:
         return None
     grav, _, tilt, amb = estimate_gravity(normals, mask)

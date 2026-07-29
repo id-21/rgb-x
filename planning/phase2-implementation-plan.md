@@ -44,6 +44,14 @@ Samples affected: <list, or "all 12">
 **If a gate fails, stop and report.** Do not proceed to the next task, and do not
 loosen a gate to make it pass. A failing gate is information.
 
+*Exception, and the distinction matters:* a gate may be **revised** if the failure
+shows the gate was specified wrong rather than the code being wrong — but only with
+the measurement written into this document, and only when the gate protecting the
+actual output still passes exactly. T0's determinism gate was revised on exactly
+those terms: renders stayed byte-identical while the float-equality demand on derived
+values was replaced by a measured tolerance. "The output is unaffected and here is
+the number" is a revision; "this is close enough" is not.
+
 **Never delete or overwrite `outputs/baseline/`** (see T0).
 
 ---
@@ -87,12 +95,63 @@ Create `wallpaper_v2/harness/` with:
 **`wall_coverage` is a new metric and the most important one T0 adds.** Defined as:
 
 ```
-wall_coverage = (pixels with labels >= 0) / (pixels with conf > 0.5)
+wall_coverage = (pixels with labels >= 0) / (pixels with conf > WALL_CONF_T)
 ```
 
 i.e. what fraction of the segmenter's wall pixels actually received a plane. The
 current `top_n=4` filter silently discards the remainder, leaving holes where the
 original wall shows through. Nobody has measured this yet.
+
+**On the 0.5 threshold.** It was chosen from a distribution analysis in
+`Notebook for Output visualisation/confidence_contour_explorer.ipynb` — on a single
+room (`SAMPLE_INDEX = 0`), where Otsu returned 0.482. Reproduced across all 12
+samples, that choice holds up better than a one-room sample deserves:
+
+| Otsu threshold | value |
+|---|---|
+| min / median / max | 0.451 / **0.480** / 0.498 |
+| standard deviation | **0.014** |
+
+0.5 is within ~1.4σ of the per-sample optimum on every image. **Keep it.**
+
+But the same sweep shows the confidence map is *not* cleanly bimodal, which is the
+part that matters for T6:
+
+| | min | median | max |
+|---|---|---|---|
+| pixels in the ambiguous band (0.02–0.98) | 13.2% | **22.5%** | 40.8% |
+| mask-area change, threshold 0.3 → 0.7 | 7.2% | **22.8%** | 36.1% |
+
+Roughly a fifth of pixels sit in the soft middle, and a ±0.2 threshold move swings
+mask area by ~23%. So the *value* is well chosen, but **hard thresholding is
+discarding real information** — those ~22% of pixels are precisely the boundary
+region, and a binary cut resolves them by coin-flip rather than by evidence. That is
+the strongest available argument for T6's soft-confidence approach: the guided filter
+should be resolving that band using depth and normal discontinuity, not a threshold.
+
+Widest bands: `obstacle_course_living` (40.8%), `no_walls_living` (38.0%),
+`simple_living_2` (37.2%). Note `obstacle_course_living` is also one of the two
+samples producing spurious planes — worth checking in T5 whether mushy confidence and
+bad plane fits are related, though `no_walls_living` has a wide band and clean planes,
+so the correlation is not straightforward.
+
+Three consequences for this task:
+
+1. **Define `WALL_CONF_T = 0.5` as a single named constant** in `geometry.py` and
+   import it everywhere the threshold is currently inlined (`run_all.py:139`,
+   `experiments/resolution_sensitivity.py`, legacy
+   `visualize_with_precomputed_normals.py:376`). It is a real parameter with a real
+   sensitivity and should be visible as one.
+2. **Freeze it in the coverage denominator.** T6 replaces the hard threshold with
+   soft-confidence filtering. If the denominator tracks whatever the mask currently
+   does, `wall_coverage` moves for reasons unrelated to coverage and stops being
+   comparable across tasks. The denominator stays `conf > 0.5` for the whole of
+   Phase 2, even after T6 changes how the mask is derived.
+3. **Promote the notebook analysis to a script.** Add
+   `experiments/confidence_threshold_sweep.py` reproducing the per-sample Otsu,
+   ambiguous-band and mask-area-sensitivity table above, so it can be re-run when the
+   eval set grows. The notebook analysed one room; the conclusion needs to be
+   re-checked once there are 100+.
 
 **`compare_to_baseline.py`** — reruns the pipeline, matches planes to the baseline by
 normal direction (reuse the `match()` logic in
@@ -108,9 +167,57 @@ non-zero if any hard gate is violated.
 
 ### Gate
 
-Comparing the pipeline to its own freshly-captured baseline must produce zero drift.
-If it doesn't, there is nondeterminism to find before anything else proceeds — most
-likely the k-means seed.
+> **REVISED after the first T0 run.** The original gate demanded exact float equality
+> from a threaded clustering library. That was a specification error, not a code
+> defect — see "Measured noise floor" below. The gate is now a tolerance for derived
+> floats, and remains exact where it can be.
+
+| quantity | gate | measured on 12 samples |
+|---|---|---|
+| `final.png` bytes | **exact** | identical, 12/12 |
+| `wall_coverage` | **exact** | 0 drift |
+| gravity vector | **exact** | 0 drift |
+| plane offset `d` | ≤ 1 mm | 0 drift |
+| plane normal direction | ≤ **0.1°** | max 0.027° |
+| planes lost | **0** | 0 |
+
+### Measured noise floor
+
+sklearn's `KMeans` is not bit-reproducible across processes even with `random_state`
+fixed. The seed is honoured; the variance is underneath it, in the floating-point
+summation order of the threaded Lloyd iteration — thread scheduling changes the order
+in which cluster centroids accumulate, which shifts them by ~1 ulp, which flips a
+handful of pixels sitting exactly on a cluster boundary.
+
+Measured consequence: **plane normals move by at most 0.027°. Nothing else moves at
+all, and every rendered image is byte-identical.** A 0.027° rotation of a wall
+produces sub-1/255 changes after rendering, so the noise never reaches the output.
+
+**Do not try to eliminate this.** It is a known rabbit hole:
+
+- The `OMP_NUM_THREADS` family only takes effect if set **before** numpy/sklearn are
+  imported. Setting them inside a running process does nothing, which likely explains
+  why that attempt failed. `threadpoolctl.threadpool_limits(limits=1)` is the correct
+  in-process mechanism and is worth one cheap experiment.
+- Even done correctly, single-threading does not guarantee reproducibility *across
+  machines*. This project develops on arm64/Accelerate and will serve on
+  Linux/OpenBLAS. Bit-exactness across both is not achievable without pinning the
+  numeric stack, which is far more cost than the 0.027° justifies.
+
+**Record the noise floor and move on.** Print it in the harness output so it stays
+visible: if it ever grows beyond ~0.1°, that is a real signal worth investigating.
+
+### Is the risk really zero?
+
+No, and it's worth being precise about where it isn't. Boundary flips are harmless
+for plane *parameters* but could in principle reorder plane *IDs*, since T1 sorts by
+pixel count. That would matter — swapped IDs mean swapped wallpaper assignments.
+
+Measured: the closest adjacent plane-size ratio across the whole set is **0.797**
+(`complex_living`, shares 0.153 vs 0.122). Every other sample is further apart. A
+0.027° wobble cannot move a 20% size gap, so ordering is stable today.
+
+It will not stay that way at 100+ samples. See the tie-break requirement in T1.
 
 ### Commit
 
@@ -145,9 +252,23 @@ it will break saved user designs the moment the pipeline is updated.
 In `geometry.py`, at the end of `cluster_planes`, order planes by a **content-derived
 key** rather than cluster size alone:
 
-1. primary: descending pixel count (stable, already computed)
-2. tie-break: ascending plane distance `d`
+1. primary: descending pixel count, **quantised** — see below
+2. tie-break: ascending plane distance `d`, quantised to 1 cm
 3. final tie-break: ascending centroid x, then y in image space
+
+**The quantisation is the important part, not the ordering.** T0 established that
+k-means flips a few boundary pixels between runs. Sorting on a raw pixel count means
+two planes of nearly equal size can swap IDs on a rerun — and swapped IDs mean
+swapped wallpaper assignments, which is a user-visible bug, unlike the harmless
+0.027° normal wobble.
+
+Quantise the primary key to **0.5% of total wall pixels** (`round(npix / wall_px *
+200)`) so that near-equal planes compare equal and fall through to `d`, which is
+stable. Planes genuinely differing in size still sort by size.
+
+Currently the closest adjacent size ratio in the set is 0.797 (`complex_living`), so
+nothing is at risk today. This is insurance for the 100+ image set, where near-ties
+are close to certain.
 
 Emit the ordering as the plane ID. Document that IDs are positional and only stable
 for a *given* input — they are not global identifiers across different photos.
@@ -163,14 +284,22 @@ hardcoded `42`, so determinism can actually be tested.
   1° / 0.05 m
 - assert plane ID *k* refers to the same physical plane across all three seeds
 - run the full pipeline twice with identical settings; assert identical `render_sha256`
+- **near-tie simulation**: perturb each plane's pixel count by ±0.4% and assert the
+  ID ordering does not change. This is the test that proves the quantisation works;
+  without it the tie-break is untested until a real near-tie appears in the data.
 
 ### Gate
 
 - plane identity stable across ≥3 seeds on ≥11 of 12 samples
 - byte-identical renders across repeated runs
+- near-tie simulation produces no reordering on any sample
 
-If a sample fails seed-stability, that is a finding worth reporting — it means
-k-means is landing in different local minima, which is itself a quality signal.
+Seed variation is a *stronger* perturbation than the T0 process-to-process noise —
+different seeds change k-means initialisation, not just summation order. If a sample
+fails seed-stability, that is a real finding: it means k-means is landing in
+genuinely different local minima on that image, which is a quality signal about the
+clustering, not about reproducibility. Report it rather than working around it, and
+feed it into T5.
 
 ### Commit
 
@@ -450,6 +579,25 @@ Three hypotheses, and they need different fixes:
    spatially interleaved rather than compact.
 3. **Bad normals** — glass, mirrors, TV screens. `model_vs_depth_normal_deg` is
    already computed and should flag these.
+
+**Also in scope: whether k-means is the right algorithm at all.** T0 showed it is not
+reproducible across processes, and it carries an arbitrary `n_clusters=8` that then
+needs a 12° merge step and an offset-split step to clean up after it. Three
+parameters doing the work of one.
+
+A deterministic mode-seeking alternative — histogram the normals on the sphere, take
+the dominant mode, assign everything within θ, remove, repeat — would remove the
+seed, the cluster count, the merge step, and the nondeterminism together. It is also
+more honest about what the data is: a few dominant directions, not eight balanced
+clusters.
+
+Evaluate it here rather than as a separate task, because the spurious-plane findings
+are exactly the evidence needed to judge whether clustering is the cause. If k-means
+is producing the 29–58° pairs by slicing a noisy surface, replacing it is the fix.
+
+Note the argument for replacing it is **quality and simplicity, not determinism** —
+the 0.027° reproducibility wobble is harmless on its own and is not sufficient
+justification for a rewrite.
 
 ### Changes
 

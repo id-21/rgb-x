@@ -16,6 +16,15 @@ import numpy as np
 import cv2
 from sklearn.cluster import KMeans
 
+# Wall-confidence threshold: pixels with conf > WALL_CONF_T are treated as
+# wall. Chosen from a per-sample Otsu sweep in
+# experiments/confidence_threshold_sweep.py -- median Otsu 0.480, std 0.014
+# across all 12 samples, so 0.5 sits within ~1.4 sigma of the per-sample
+# optimum everywhere. Frozen for the whole of Phase 2, including after T6
+# replaces hard thresholding with soft-confidence filtering, so wall_coverage
+# stays comparable across tasks.
+WALL_CONF_T = 0.5
+
 
 # ---------------------------------------------------------------------------
 # 1. Normal decoding

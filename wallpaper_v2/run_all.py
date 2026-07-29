@@ -18,7 +18,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent))
 from geometry import (load_normals, estimate_gravity, cluster_planes,
-                      fit_planes, compute_uv, verify)
+                      fit_planes, compute_uv, verify, WALL_CONF_T)
 from render import (sample_texture, shading_from_irradiance,
                     shading_from_luminance, composite, feather_mask,
                     irradiance_polarity)
@@ -136,7 +136,7 @@ def process(name, texture_bgr, tag, save_steps=True):
     print(f"      f = {f_full:.1f} px at native, {f:.1f} px at {W}x{H} "
           f"({f/W:.2f} x width)" + ("" if s == 1.0 else f"  [scaled {s:.2f}x]"))
 
-    mask = conf > 0.5
+    mask = conf > WALL_CONF_T
     if mask.sum() < 0.01 * mask.size:
         return None, f"{name}: wall mask nearly empty ({100*mask.mean():.1f}%)"
 
@@ -160,6 +160,7 @@ def process(name, texture_bgr, tag, save_steps=True):
     del along_g, ys, xs, Zs
     checks = verify(planes, grav, info)
     angs = [v for k, v in [(c[0], c[1]) for c in checks] if k.startswith("angle")]
+    wall_coverage = float((labels >= 0).sum() / max(mask.sum(), 1))
 
     diag = dict(
         sample=name, texture=tag,
@@ -172,6 +173,7 @@ def process(name, texture_bgr, tag, save_steps=True):
         n_planes=len(planes),
         wall_pair_angles_deg=[float(a) for a in angs],
         reconstructed_vertical_extent_m=ceiling_h,
+        wall_coverage=wall_coverage,
         planes={int(l): dict(
             normal=[float(x) for x in p['n']],
             distance_m=float(p['d']),
