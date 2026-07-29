@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rgb-x.internal/schema/scene-v1.schema.json",
+  "title": "scene.json v1",
+  "description": "Server/client contract for the wallpaper compositing bundle. See SCHEMA.md for the conventions this schema cannot express (sign/unit conventions, why fields exist).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "pipeline_sha", "image", "camera", "gravity", "planes",
+               "regions", "quality", "shading", "pattern"],
+  "properties": {
+    "version": { "const": 1 },
+    "pipeline_sha": { "type": "string" },
+
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height"],
+      "properties": {
+        "width":  { "type": "integer", "exclusiveMinimum": 0 },
+        "height": { "type": "integer", "exclusiveMinimum": 0 }
+      }
+    },
+
+    "camera": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["f_px", "cx", "cy"],
+      "properties": {
+        "f_px": { "type": "number", "exclusiveMinimum": 0 },
+        "cx":   { "type": "number" },
+        "cy":   { "type": "number" }
+      }
+    },
+
+    "gravity": { "$ref": "#/$defs/unitVec3" },
+
+    "planes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/plane" }
+    },
+
+    "regions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/region" }
+    },
+
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["vertical_extent_m", "wall_pair_angles_deg",
+                   "non_manhattan_major_pairs", "gravity_tilt_deg",
+                   "gravity_ambiguous", "wall_coverage",
+                   "irradiance_polarity_corr", "max_model_vs_depth_deg"],
+      "properties": {
+        "vertical_extent_m":         { "type": "number", "exclusiveMinimum": 0 },
+        "wall_pair_angles_deg":      { "type": "array", "items": { "type": "number" } },
+        "non_manhattan_major_pairs": { "type": "integer", "minimum": 0 },
+        "gravity_tilt_deg":          { "type": "number", "minimum": 0 },
+        "gravity_ambiguous":         { "type": "boolean" },
+        "wall_coverage":             { "type": "number", "minimum": 0, "maximum": 1 },
+        "irradiance_polarity_corr":  { "type": "number", "minimum": -1, "maximum": 1 },
+        "max_model_vs_depth_deg":    { "type": "number", "minimum": 0 }
+      }
+    },
+
+    "shading": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scale"],
+      "properties": {
+        "scale": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+
+    "pattern": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["default_width_m"],
+      "properties": {
+        "default_width_m": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    }
+  },
+
+  "$defs": {
+    "unitVec3": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 3,
+      "maxItems": 3
+    },
+
+    "plane": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "normal", "d", "u_axis", "v_axis", "origin",
+                   "px_share", "extent_m", "confidence",
+                   "model_vs_depth_deg", "suggested_label"],
+      "properties": {
+        "id":       { "type": "integer", "minimum": 0 },
+        "normal":   { "$ref": "#/$defs/unitVec3" },
+        "d":        { "type": "number", "exclusiveMinimum": 0 },
+        "u_axis":   { "$ref": "#/$defs/unitVec3" },
+        "v_axis":   { "$ref": "#/$defs/unitVec3" },
+        "origin":   { "$ref": "#/$defs/unitVec3" },
+        "px_share": { "type": "number", "minimum": 0, "maximum": 1 },
+        "extent_m": {
+          "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2
+        },
+        "confidence":         { "type": "number", "minimum": 0, "maximum": 1 },
+        "model_vs_depth_deg": { "type": ["number", "null"], "minimum": 0 },
+        "suggested_label":    { "type": "string" }
+      }
+    },
+
+    "region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "plane", "npix", "area_m2", "centroid_px", "bbox_px"],
+      "properties": {
+        "id":    { "type": "integer", "minimum": 0 },
+        "plane": { "type": "integer", "minimum": 0 },
+        "npix":  { "type": "integer", "exclusiveMinimum": 0 },
+        "area_m2": { "type": "number", "minimum": 0 },
+        "centroid_px": {
+          "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2
+        },
+        "bbox_px": {
+          "type": "array", "items": { "type": "number" }, "minItems": 4, "maxItems": 4
+        }
+      }
+    }
+  }
+}
