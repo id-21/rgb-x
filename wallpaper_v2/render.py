@@ -240,10 +240,40 @@ def feather_mask(mask, radius=2):
     return cv2.GaussianBlur(m, (k, k), 0)
 
 
-def composite(original_rgb, texture_rgb, mask, shading, feather=2):
-    """Apply shading to the texture and blend it over the photo."""
-    tex = texture_rgb.astype(np.float32)
-    shaded = np.clip(tex * shading[..., None], 0, 255)
+def srgb_to_linear(x):
+    """sRGB-encoded [0,1] -> linear light [0,1]. Proper piecewise transfer
+    function (IEC 61966-2-1), not a 2.2 gamma approximation."""
+    x = np.clip(x, 0.0, 1.0)
+    return np.where(x <= 0.04045, x / 12.92, ((x + 0.055) / 1.055) ** 2.4)
+
+
+def linear_to_srgb(x):
+    """Linear light [0,1] -> sRGB-encoded [0,1]. Inverse of srgb_to_linear."""
+    x = np.clip(x, 0.0, 1.0)
+    return np.where(x <= 0.0031308, x * 12.92, 1.055 * np.power(x, 1.0 / 2.4) - 0.055)
+
+
+def composite(original_rgb, texture_rgb, mask, shading, feather=2, linear=True):
+    """
+    Apply shading to the texture and blend it over the photo.
+
+    linear=True (default): decode photo and texture from sRGB to linear
+    light, multiply the texture by shading and alpha-blend there, then
+    re-encode to sRGB. Light attenuation is a linear-space operation --
+    multiplying sRGB-encoded values directly (linear=False, kept for A/B
+    comparison) is not a physical model of attenuation and crushes midtones,
+    making shaded regions read as muddy rather than dimmer.
+    """
     a = feather_mask(mask, feather)[..., None]
-    out = original_rgb.astype(np.float32) * (1 - a) + shaded * a
+    if not linear:
+        tex = texture_rgb.astype(np.float32)
+        shaded = np.clip(tex * shading[..., None], 0, 255)
+        out = original_rgb.astype(np.float32) * (1 - a) + shaded * a
+        return np.clip(out, 0, 255).astype(np.uint8)
+
+    photo_lin = srgb_to_linear(original_rgb.astype(np.float32) / 255.0)
+    tex_lin = srgb_to_linear(texture_rgb.astype(np.float32) / 255.0)
+    shaded_lin = np.clip(tex_lin * shading[..., None], 0.0, None)
+    out_lin = photo_lin * (1 - a) + shaded_lin * a
+    out = linear_to_srgb(np.clip(out_lin, 0.0, 1.0)) * 255.0
     return np.clip(out, 0, 255).astype(np.uint8)
