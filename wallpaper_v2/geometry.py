@@ -123,7 +123,8 @@ def estimate_gravity(normals, mask, prior_weight=0.05):
 # ---------------------------------------------------------------------------
 
 def cluster_planes(normals, mask, depth=None, fx=None, cx=None, cy=None,
-                   n_clusters=8, top_n=4, min_frac=0.02, merge_deg=12.0):
+                   n_clusters=8, top_n=4, min_frac=0.02, merge_deg=12.0,
+                   random_state=42):
     """
     Cluster wall pixels into planes.
 
@@ -134,16 +135,23 @@ def cluster_planes(normals, mask, depth=None, fx=None, cx=None, cy=None,
     clusters are additionally split by plane offset so that two parallel-but-
     distinct walls stay separate.
 
+    Plane IDs (the returned label values) are positional, derived from each
+    kept plane's own pixel count / distance / image position -- NOT from
+    k-means' arbitrary cluster-label order. IDs are only stable for a given
+    input; they are not global identifiers across different photos. See
+    `_order_kept_planes` for the ordering.
+
     Returns labels (H,W) int32 with -1 = not a wall.
     """
     H, W = mask.shape
     N = normals[mask]
+    wall_px = len(N)
 
     # subsample for the fit; assign at full resolution afterwards
-    rng = np.random.default_rng(42)
+    rng = np.random.default_rng(random_state)
     idx = rng.choice(len(N), min(len(N), 200_000), replace=False)
 
-    km = KMeans(n_clusters=n_clusters, random_state=42, n_init=10).fit(N[idx])
+    km = KMeans(n_clusters=n_clusters, random_state=random_state, n_init=10).fit(N[idx])
     centres = km.cluster_centers_
     centres /= (np.linalg.norm(centres, axis=1, keepdims=True) + 1e-12)
 
@@ -182,10 +190,51 @@ def cluster_planes(normals, mask, depth=None, fx=None, cx=None, cy=None,
     keep = [l for l, c in sorted(counts.items(), key=lambda kv: -kv[1])[:top_n]
             if c >= min_frac * mask.sum()]
 
+    ordered = _order_kept_planes(labels, keep, normals, wall_px, depth, fx, cx, cy)
+
     out = np.full(mask.shape, -1, dtype=np.int32)
-    for new, old in enumerate(keep):
+    for new, old in enumerate(ordered):
         out[labels == old] = new
     return out
+
+
+def _order_kept_planes(labels, keep, normals, wall_px, depth, fx, cx, cy):
+    """
+    Order kept plane labels by a content-derived key, so plane IDs are
+    reproducible across runs rather than following k-means' arbitrary label
+    order.
+
+    Sort key, ascending:
+      1. pixel count, DESCENDING, quantised to 0.5% of total wall pixels
+         (round(npix / wall_px * 200)) -- k-means is not bit-reproducible
+         across processes (see T0's measured noise floor), so a raw pixel
+         count can flip a coin between two near-equal planes on a rerun.
+         Quantising makes near-ties compare equal and fall through to `d`,
+         which is stable; planes genuinely differing in size still sort
+         correctly.
+      2. plane distance `d`, ascending, quantised to 1 cm (only when depth
+         is available)
+      3. image-space centroid x, then y, ascending
+    """
+    keys = {}
+    for l in keep:
+        sel = labels == l
+        npix = int(sel.sum())
+        qcount = round(npix / max(wall_px, 1) * 200)   # units of 0.5%
+
+        qd = 0
+        if depth is not None:
+            n = normals[sel].mean(0)
+            n /= np.linalg.norm(n) + 1e-12
+            d = float(np.median(points_for(sel, depth, fx, cx, cy) @ n))
+            qd = round(d / 0.01)                        # units of 1 cm
+
+        ys, xs = np.nonzero(sel)
+        cx_px, cy_px = float(xs.mean()), float(ys.mean())
+
+        keys[l] = (-qcount, qd, cx_px, cy_px)
+
+    return sorted(keep, key=lambda l: keys[l])
 
 
 def points_for(sel, depth, fx, cx, cy):
