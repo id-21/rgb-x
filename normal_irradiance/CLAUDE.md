@@ -201,7 +201,7 @@ result_srgb = shadowed ** (1/2.2)  # Convert back to sRGB
 
 
 ## Setup / rebuild (local Mac, non-CUDA)
-`venv/` is disposable; `requirements-local.txt` lists the deps for `run_normal_irradiance_local.py`. For the Gradio demo or GPU use the conda route in PAVED PATH instead.
+`venv/` is disposable; `requirements-local.txt` lists the deps for `run_normal_irradiance_local.py`. For an exact rebuild use `requirements-local.lock.txt` (a `pip freeze` of the working venv; the unpinned torch/numpy/opencv in the loose file can drift against the old diffusers 0.20 / transformers 4.35). For the Gradio demo or GPU use the conda route in PAVED PATH instead.
 ```bash
 python3 -m venv venv
 ./venv/bin/pip install -r requirements-local.txt
