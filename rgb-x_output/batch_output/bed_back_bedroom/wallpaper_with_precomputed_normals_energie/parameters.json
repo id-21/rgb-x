@@ -1,0 +1,12 @@
+{
+  "pattern_width_m": 0.53,
+  "pattern_height_m": 1.0,
+  "fx_multiplier": 0.8,
+  "n_clusters": 10,
+  "top_n_clusters": 5,
+  "image_size": "1200 x 700",
+  "focal_length": "fx=960.0, fy=960.0",
+  "num_planes_detected": 5,
+  "used_precomputed_normals": true,
+  "normal_file": "/Users/ishan-aiworkspace/Documents/apps/rgb-x/rgb-x_output/batch_output/bed_back_bedroom/bed_back_bedroom_normal.npy"
+}

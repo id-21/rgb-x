@@ -1,0 +1,7 @@
+1480.126221
+
+# Additional info:
+# Image size: 3400 x 2216
+# Default fx (0.8 * width): 2720.00
+# Predicted focal length: 1480.13
+# Ratio (predicted/default): 0.544

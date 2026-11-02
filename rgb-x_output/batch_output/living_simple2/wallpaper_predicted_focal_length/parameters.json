@@ -1,0 +1,14 @@
+{
+  "pattern_width_m": 0.53,
+  "pattern_height_m": 1.0,
+  "fx_multiplier": 0.8,
+  "n_clusters": 10,
+  "top_n_clusters": 5,
+  "image_size": "1024 x 682",
+  "focal_length_px": "473.37",
+  "focal_length_source": "predicted",
+  "focal_length_file": "/Users/ishan-aiworkspace/Documents/apps/rgb-x/normal_irradiance/example/living_simple2_focal_length.npy",
+  "num_planes_detected": 5,
+  "used_precomputed_normals": true,
+  "normal_file": "/Users/ishan-aiworkspace/Documents/apps/rgb-x/rgb-x_output/batch_output/living_simple2/living_simple2_normal.npy"
+}

@@ -1,5 +1,4 @@
 private-key.txt
-rgb-x_output/
 __pycache__/
 *.pyc
 model_cache*/
@@ -14,3 +13,13 @@ Notebook for Output visualisation/venv_notebook/
 .DS_Store
 # local venv
 venv-310/
+
+# rgb-x_output: commit source photos + small metadata only; model outputs (npy/exr/pkl/png) are derived and regenerable
+rgb-x_output/**/*.npy
+rgb-x_output/**/*.exr
+rgb-x_output/**/*.pkl
+rgb-x_output/**/*.png
+!rgb-x_output/**/*.jpg
+!rgb-x_output/**/*.jpeg
+rgb-x_output/**/*_x3_*.jpg
+rgb-x_output/**/*preview*.jpg

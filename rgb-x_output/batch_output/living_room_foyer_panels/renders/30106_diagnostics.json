@@ -1,0 +1,260 @@
+{
+  "sample": "living_room_foyer_panels",
+  "texture": "30106",
+  "normals_were_encoded": true,
+  "focal_px_native": 764.0261840820312,
+  "focal_px_used": 764.0261840820312,
+  "working_size": [
+    1160,
+    522
+  ],
+  "gravity": [
+    -0.003079139568278801,
+    -0.9930591783368222,
+    0.11757545330771436
+  ],
+  "gravity_tilt_from_image_vertical_deg": 6.754521526734798,
+  "gravity_residual_rms": 0.05847014741574243,
+  "gravity_ambiguous_single_wall": true,
+  "n_planes": 5,
+  "wall_pair_angles_deg": [
+    13.542113304138184,
+    21.217819213867188,
+    45.74150848388672,
+    27.123226165771484,
+    33.37406539916992,
+    57.748992919921875,
+    34.897239685058594,
+    24.5603084564209,
+    36.18190383911133,
+    53.757179260253906
+  ],
+  "reconstructed_vertical_extent_m": 2.2632474920698566,
+  "wall_coverage": 0.9922761685104831,
+  "planes": {
+    "0": {
+      "normal": [
+        -0.1160346046090126,
+        0.12217048555612564,
+        0.9857029914855957
+      ],
+      "distance_m": 3.0161090466385616,
+      "model_vs_depth_normal_deg": 9.866229587710558,
+      "px_share": 0.9554356749149759,
+      "extent_m": [
+        3.8409537632969126,
+        1.6019325525947727
+      ],
+      "pattern_repeats_across": 7.247082572258325,
+      "grazing_px_dropped": 0,
+      "confidence": 0.9485096969858979
+    },
+    "1": {
+      "normal": [
+        -0.33226749300956726,
+        0.19256484508514404,
+        0.9233185052871704
+      ],
+      "distance_m": 3.0707361359739123,
+      "model_vs_depth_normal_deg": 21.346227971151734,
+      "px_share": 0.014564846305200474,
+      "extent_m": [
+        4.74189083033772,
+        2.039266791380057
+      ],
+      "pattern_repeats_across": 8.946963830825887,
+      "grazing_px_dropped": 0,
+      "confidence": 0.587602978296847
+    },
+    "2": {
+      "normal": [
+        0.24135352671146393,
+        0.2028207629919052,
+        0.9490059018135071
+      ],
+      "distance_m": 3.177251594750775,
+      "model_vs_depth_normal_deg": 21.87018358022714,
+      "px_share": 0.008815136233923616,
+      "extent_m": [
+        3.328463337511555,
+        1.9533219126536814
+      ],
+      "pattern_repeats_across": 6.280119504738782,
+      "grazing_px_dropped": 0,
+      "confidence": 0.5839514679676543
+    },
+    "3": {
+      "normal": [
+        0.6175061464309692,
+        0.22991086542606354,
+        0.752214789390564
+      ],
+      "distance_m": 3.150414243711868,
+      "model_vs_depth_normal_deg": 45.1570754346703,
+      "px_share": 0.007710800985106133,
+      "extent_m": [
+        1.1833309634065365,
+        1.8091445953179366
+      ],
+      "pattern_repeats_across": 2.232699930955729,
+      "grazing_px_dropped": 0,
+      "confidence": 0.49774902642516183
+    },
+    "4": {
+      "normal": [
+        -0.05864281579852104,
+        -0.34086450934410095,
+        0.9382816553115845
+      ],
+      "distance_m": 2.62421101932625,
+      "model_vs_depth_normal_deg": 18.76733894797109,
+      "px_share": 0.005749710071276859,
+      "extent_m": [
+        2.4377947040506234,
+        1.1050877040187934
+      ],
+      "pattern_repeats_across": 4.599612649152119,
+      "grazing_px_dropped": 0,
+      "confidence": 0.5902308936973332
+    }
+  },
+  "regions": {
+    "0": {
+      "plane": 0,
+      "npix": 46796,
+      "centroid_px": [
+        115.36577912642106,
+        251.77782289084539
+      ],
+      "bbox_px": [
+        50,
+        44,
+        176,
+        461
+      ],
+      "suggested_label": "back wall"
+    },
+    "1": {
+      "plane": 0,
+      "npix": 28756,
+      "centroid_px": [
+        261.355508415635,
+        254.41160105717069
+      ],
+      "bbox_px": [
+        222,
+        49,
+        300,
+        460
+      ],
+      "suggested_label": "back wall"
+    },
+    "2": {
+      "plane": 0,
+      "npix": 153494,
+      "centroid_px": [
+        543.9505648429255,
+        255.07658279802467
+      ],
+      "bbox_px": [
+        349,
+        53,
+        748,
+        458
+      ],
+      "suggested_label": "back wall"
+    },
+    "3": {
+      "plane": 0,
+      "npix": 24897,
+      "centroid_px": [
+        824.3694822669398,
+        258.1513435353657
+      ],
+      "bbox_px": [
+        786,
+        63,
+        864,
+        455
+      ],
+      "suggested_label": "back wall"
+    },
+    "4": {
+      "plane": 0,
+      "npix": 38078,
+      "centroid_px": [
+        959.018041913966,
+        264.3252009034088
+      ],
+      "bbox_px": [
+        902,
+        64,
+        1024,
+        460
+      ],
+      "suggested_label": "back wall"
+    },
+    "5": {
+      "plane": 1,
+      "npix": 762,
+      "centroid_px": [
+        59.186351706036746,
+        297.66272965879267
+      ],
+      "bbox_px": [
+        54,
+        167,
+        65,
+        451
+      ],
+      "suggested_label": "back wall"
+    },
+    "6": {
+      "plane": 2,
+      "npix": 396,
+      "centroid_px": [
+        295.8787878787879,
+        123.97222222222223
+      ],
+      "bbox_px": [
+        295,
+        55,
+        298,
+        209
+      ],
+      "suggested_label": "back wall"
+    },
+    "7": {
+      "plane": 3,
+      "npix": 771,
+      "centroid_px": [
+        858.0025940337224,
+        264.461738002594
+      ],
+      "bbox_px": [
+        852,
+        65,
+        866,
+        457
+      ],
+      "suggested_label": "back wall"
+    },
+    "8": {
+      "plane": 4,
+      "npix": 1454,
+      "centroid_px": [
+        553.560522696011,
+        454.257909215956
+      ],
+      "bbox_px": [
+        352,
+        451,
+        738,
+        457
+      ],
+      "suggested_label": "back wall"
+    }
+  },
+  "irradiance_polarity_corr": 0.9894940995752923,
+  "shading": "irradiance"
+}

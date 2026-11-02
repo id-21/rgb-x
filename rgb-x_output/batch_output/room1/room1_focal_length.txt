@@ -1,0 +1,7 @@
+3202.718506
+
+# Additional info:
+# Image size: 3000 x 4500
+# Default fx (0.8 * width): 2400.00
+# Predicted focal length: 3202.72
+# Ratio (predicted/default): 1.334

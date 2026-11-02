@@ -1,0 +1,7 @@
+3643.178711
+
+# Additional info:
+# Image size: 4380 x 2920
+# Default fx (0.8 * width): 3504.00
+# Predicted focal length: 3643.18
+# Ratio (predicted/default): 1.040
