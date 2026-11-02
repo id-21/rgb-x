@@ -198,3 +198,11 @@ result_srgb = shadowed ** (1/2.2)  # Convert back to sRGB
 - Use GPU with at least 8GB VRAM
 - Expected speed: 2 AOVs in ~5-8 seconds (T4 GPU)
 </paved_path>
+
+
+## Setup / rebuild (local Mac, non-CUDA)
+`venv/` is disposable; `requirements-local.txt` lists the deps for `run_normal_irradiance_local.py`. For the Gradio demo or GPU use the conda route in PAVED PATH instead.
+```bash
+python3 -m venv venv
+./venv/bin/pip install -r requirements-local.txt
+```

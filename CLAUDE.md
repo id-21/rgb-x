@@ -61,6 +61,21 @@ There is no repo-wide dependency manifest for `wallpaper_v2`. Its runtime deps (
 - `verify.py` — standalone post-hoc numeric QA over `outputs/summary.json`
 - `experiments/resolution_sensitivity.py` — standalone experiment validating a resolution claim in `planning/web-service-strategy.md`
 
+## Models
+
+Weights are **not committed and not needed to read/edit code** — they download on first run. Only `wallpaper_v2` runs without any model (it consumes precomputed `.npy` files).
+
+| Model | Hugging Face ID | Size | Used by |
+|---|---|---|---|
+| RGB→X (normals, irradiance, albedo, …) | `zheng95z/rgb-to-x` | ~4.8 GB | `normal_irradiance/`, `rgbx/rgb2x/` |
+| CLIP ViT-L/14 tokenizer + text encoder | `openai/clip-vit-large-patch14` | ~3.6 MB (tokenizer files only) | loaded by the `pipeline_*.py` files |
+| Depth Pro (external, sibling project `../ml-depth-pro`) | — | ~1.8 GB | produces `*_depth.npy` / `*_focal_length.npy` that `wallpaper_v2` reads |
+
+**Downloading**
+- **RGB→X** — automatic. `StableDiffusionAOVMatEstPipeline.from_pretrained("zheng95z/rgb-to-x", cache_dir=...)` in `normal_irradiance/run_normal_irradiance_local.py` and `gradio_demo_normal_irradiance.py` (and the equivalent in `rgbx/rgb2x/gradio_demo_rgb2x.py`) fetches it on first run. The first run needs internet and several GB of free disk; later runs are offline. The pipeline is public (no HF token). Manual alternative: `git clone https://huggingface.co/zheng95z/rgb-to-x` (needs `git lfs`).
+- **CLIP tokenizer** — fetched automatically alongside the pipeline; nothing to do.
+- **Depth Pro** — not downloaded from this repo. From the `ml-depth-pro` project run `source get_pretrained_models.sh`, which does `curl -L https://ml-site.cdn-apple.com/models/depth-pro/depth_pro.pt -o checkpoints/depth_pro.pt`. Only needed to generate new depth maps, not to re-render existing samples.
+
 ## Sub-project docs (don't duplicate, read these directly)
 
 - `normal_irradiance/CLAUDE.md` — the RGB→X inference variant (normals + irradiance only), gamma/linear-space conventions

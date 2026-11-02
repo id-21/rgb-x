@@ -1,0 +1,19 @@
+# Deps for running run_normal_irradiance_local.py on a local (non-CUDA) machine,
+# e.g. a Mac, inside normal_irradiance/venv.
+#
+# Deliberately NOT using rgbx/environment.yml, which pins pytorch-cuda=12.1
+# and is meant for a cloud CUDA box (see CLAUDE.md).
+torch
+torchvision
+# diffusers==0.20.0 is from Aug 2023. transformers/accelerate/huggingface_hub
+# must be pinned to the same era -- leaving them unpinned lets pip grab
+# today's versions (transformers 5.x, accelerate 1.x, huggingface_hub 1.x),
+# which have removed/renamed internals diffusers 0.20.0 imports directly
+# (hf_cache_home, is_offline_mode, etc.), causing ImportErrors at import time.
+diffusers==0.20.0
+transformers==4.35.2
+accelerate==0.24.1
+huggingface_hub==0.19.4
+opencv-python
+numpy
+pillow

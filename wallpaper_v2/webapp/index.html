@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>Wallpaper preview — WebGL2 renderer</title>
+<style>
+  :root { --bg:#faf9f7; --fg:#1c1b19; --mut:#6b6862; --line:#e2ded7; --card:#fff; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#171614; --fg:#eceae6; --mut:#9a968e; --line:#2e2c28; --card:#201f1c; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+  header { padding:14px 20px; border-bottom:1px solid var(--line); display:flex;
+           gap:16px; align-items:center; flex-wrap:wrap; }
+  h1 { font-size:15px; font-weight:500; margin:0; }
+  .wrap { display:grid; grid-template-columns:1fr 300px; gap:20px; padding:20px;
+          align-items:start; }
+  @media (max-width:900px) { .wrap { grid-template-columns:1fr; } }
+  canvas { width:100%; height:auto; display:block; border-radius:10px;
+           border:1px solid var(--line); background:var(--card); }
+  .panel { border:1px solid var(--line); border-radius:10px; background:var(--card);
+           padding:14px; }
+  .lab { font-size:12px; color:var(--mut); text-transform:none; margin:0 0 6px; }
+  select, button { font:inherit; color:inherit; background:var(--card);
+                   border:1px solid var(--line); border-radius:6px; padding:6px 10px; }
+  button { cursor:pointer; }
+  button:hover { border-color:var(--mut); }
+  .grid { display:grid; grid-template-columns:repeat(4,1fr); gap:6px;
+          max-height:340px; overflow-y:auto; }
+  .sw { aspect-ratio:1; border-radius:5px; border:2px solid transparent; cursor:pointer;
+        background-size:cover; background-position:center; }
+  .sw.on { border-color:#3b82f6; }
+  .stat { display:flex; justify-content:space-between; font-size:12px; color:var(--mut);
+          padding:3px 0; }
+  .stat b { color:var(--fg); font-weight:500; }
+  .rgn { display:flex; align-items:center; gap:8px; font-size:12px; padding:4px 0;
+         cursor:pointer; border-radius:5px; }
+  .rgn:hover { background:var(--bg); }
+  .dot { width:12px; height:12px; border-radius:3px; flex:none; }
+  #err { color:#c33; font-size:12px; padding:0 20px; }
+</style>
+
+<header>
+  <h1>Wallpaper preview</h1>
+  <label class="lab" style="margin:0">room
+    <select id="sample"></select>
+  </label>
+  <label class="lab" style="margin:0">collection
+    <select id="coll"></select>
+  </label>
+  <span style="flex:1"></span>
+  <span class="lab" style="margin:0">apply to
+    <select id="target"><option value="all">all walls</option></select>
+  </span>
+</header>
+<div id="err"></div>
+
+<div class="wrap">
+  <div>
+    <canvas id="gl"></canvas>
+    <div style="display:flex; gap:16px; margin-top:10px; font-size:12px; color:var(--mut)">
+      <span>frame <b id="ms" style="color:var(--fg)">–</b></span>
+      <span>planes <b id="np" style="color:var(--fg)">–</b></span>
+      <span>regions <b id="nr" style="color:var(--fg)">–</b></span>
+      <span>f/W <b id="fw" style="color:var(--fg)">–</b></span>
+      <span><b id="dim" style="color:var(--fg)">–</b></span>
+    </div>
+  </div>
+
+  <div style="display:flex; flex-direction:column; gap:14px;">
+    <div class="panel">
+      <p class="lab">Wallpaper</p>
+      <div class="grid" id="swatches"></div>
+      <div id="meta" style="font-size:12px; color:var(--mut); margin-top:10px;"></div>
+    </div>
+    <div class="panel">
+      <p class="lab">Walls — click to target</p>
+      <div id="regions"></div>
+    </div>
+    <div class="panel">
+      <p class="lab">Scene quality</p>
+      <div id="quality"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SAMPLES = ["living_simple2","bed_back_bedroom","simple_living_3","obstacle_course_living",
+  "fluted_walls_living","perspective_living","complex_living","simple_living_2",
+  "simple_living","living_small_walls","no_walls_living","room1"];
+const BUNDLES = "../scene/golden";
+const MAXLAYERS = 8;
+const err = m => document.getElementById('err').textContent = m;
+
+const VS = `#version 300 es
+void main(){ vec2 p=vec2((gl_VertexID<<1)&2, gl_VertexID&2); gl_Position=vec4(p*2.0-1.0,0,1); }`;
+
+const FS = `#version 300 es
+precision highp float; precision highp sampler2DArray;
+out vec4 o;
+uniform vec2  uRes;
+uniform float uF, uCx, uCy;
+uniform sampler2D uPhoto, uMaps, uShade;
+uniform sampler2DArray uTex;
+uniform vec3  uN[24];
+uniform float uD[24];
+uniform vec3  uU[24];
+uniform vec3  uV[24];
+uniform vec3  uO[24];
+uniform int   uRegPlane[64];
+uniform int   uRegLayer[64];
+uniform float uRegW[64];
+uniform float uRegOff[64];
+uniform int   uHi;
+uniform float uShScale;
+
+vec3 s2l(vec3 c){ return mix(c/12.92, pow((c+0.055)/1.055, vec3(2.4)), step(0.04045,c)); }
+vec3 l2s(vec3 c){ return mix(c*12.92, 1.055*pow(c, vec3(1.0/2.4))-0.055, step(0.0031308,c)); }
+
+void main(){
+  vec2 uv0 = vec2(gl_FragCoord.x/uRes.x, 1.0 - gl_FragCoord.y/uRes.y);
+  vec4 m   = texture(uMaps, uv0);
+  vec3 base = texture(uPhoto, uv0).rgb;
+
+  int rid = int(floor(m.r*255.0+0.5)) - 1;
+  float alpha = m.b;
+  if(rid < 0 || alpha < 0.004){ o = vec4(base,1.0); return; }
+
+  int layer = uRegLayer[rid];
+  if(layer < 0){ o = vec4(base,1.0); return; }
+  int pid = uRegPlane[rid];
+
+  vec3 ray = vec3((gl_FragCoord.x - uCx)/uF, ((uRes.y - gl_FragCoord.y) - uCy)/uF, 1.0);
+  float dn = dot(uN[pid], ray);
+  if(abs(dn) < 0.02){ o = vec4(base,1.0); return; }
+  float t = uD[pid]/dn;
+  if(t <= 0.0){ o = vec4(base,1.0); return; }
+
+  vec3 rel = ray*t - uO[pid];
+  float pw = uRegW[rid];
+  vec2 uv = vec2(dot(rel, uU[pid]), -dot(rel, uV[pid]))/pw;
+
+  // Gradients are taken BEFORE the half-drop. The drop is piecewise constant in
+  // uv.x, so the true derivative is unchanged everywhere except exactly at a
+  // column boundary -- but the automatic derivative would see a huge jump there
+  // and collapse to the coarsest mip, drawing a blurred line down every column.
+  vec2 ddx = dFdx(uv), ddy = dFdy(uv);
+
+  // Half-drop / "offset" repeat: each successive COLUMN starts half a tile down.
+  uv.y += uRegOff[rid] * floor(uv.x) * 0.5;
+
+  vec3 tex = textureGrad(uTex, vec3(fract(uv), float(layer)), ddx, ddy).rgb;
+  float sh = texture(uShade, uv0).r * uShScale;
+
+  vec3 lit = s2l(tex) * sh;
+  vec3 outc = l2s(mix(s2l(base), lit, alpha));
+  if(uHi == rid) outc = mix(outc, vec3(0.23,0.51,0.96), 0.28);
+  o = vec4(outc, 1.0);
+}`;
+
+const cv = document.getElementById('gl');
+const gl = cv.getContext('webgl2', {antialias:false, preserveDrawingBuffer:false});
+if(!gl) err("WebGL2 unavailable in this browser.");
+
+function mkShader(t,src){ const s=gl.createShader(t); gl.shaderSource(s,src); gl.compileShader(s);
+  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) err(gl.getShaderInfoLog(s)); return s; }
+const prog = gl.createProgram();
+gl.attachShader(prog, mkShader(gl.VERTEX_SHADER,VS));
+gl.attachShader(prog, mkShader(gl.FRAGMENT_SHADER,FS));
+gl.linkProgram(prog);
+if(!gl.getProgramParameter(prog,gl.LINK_STATUS)) err(gl.getProgramInfoLog(prog));
+gl.useProgram(prog);
+const U = n => gl.getUniformLocation(prog,n);
+
+const aniso = gl.getExtension('EXT_texture_filter_anisotropic');
+const maxAniso = aniso ? gl.getParameter(aniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT) : 1;
+
+function tex2d(img, unit, srgbLinear){
+  const t = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE0+unit); gl.bindTexture(gl.TEXTURE_2D,t);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,img);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER, srgbLinear?gl.LINEAR:gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER, srgbLinear?gl.LINEAR:gl.NEAREST);
+  return t;
+}
+
+const TSIZE = 1024;
+let texArray = null;
+function initTexArray(){
+  texArray = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D_ARRAY, texArray);
+  gl.texImage3D(gl.TEXTURE_2D_ARRAY,0,gl.RGBA8,TSIZE,TSIZE,MAXLAYERS,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_WRAP_S,gl.REPEAT);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_WRAP_T,gl.REPEAT);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  if(aniso) gl.texParameterf(gl.TEXTURE_2D_ARRAY, aniso.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(16,maxAniso));
+}
+const scratch = document.createElement('canvas');
+scratch.width = scratch.height = TSIZE;
+const sctx = scratch.getContext('2d');
+function uploadLayer(img, layer){
+  sctx.clearRect(0,0,TSIZE,TSIZE);
+  sctx.drawImage(img,0,0,TSIZE,TSIZE);
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D_ARRAY, texArray);
+  gl.texSubImage3D(gl.TEXTURE_2D_ARRAY,0,0,0,layer,TSIZE,TSIZE,1,gl.RGBA,gl.UNSIGNED_BYTE,scratch);
+  gl.generateMipmap(gl.TEXTURE_2D_ARRAY);
+}
+
+const loadImg = src => new Promise((res,rej)=>{
+  const i=new Image(); i.crossOrigin='anonymous';
+  i.onload=()=>res(i); i.onerror=()=>rej(src); i.src=src; });
+
+async function loadTextureImage(a){
+  if(a.cloudUrl){
+    try { return { img: await loadImg(a.cloudUrl), src: 'cloud' }; }
+    catch(e){ /* CORS or 404 - fall back */ }
+  }
+  return { img: await loadImg(a.placeholder), src: 'placeholder' };
+}
+
+let scene=null, assets=[], filtered=[], regionLayer=[], regionAsset=[], layerOf={}, hi=-1;
+let target='all', superScale=1;
+
+async function loadSample(name){
+  const base = `${BUNDLES}/${name}`;
+  scene = await (await fetch(`${base}/scene.json`)).json();
+  const [photo, maps, shade] = await Promise.all([
+    loadImg(`${base}/photo.jpg`),
+    loadImg(`${base}/maps.png`),
+    loadImg(`${base}/shading.png`) ]);
+  // Render at device-pixel resolution, not bundle resolution. The camera
+  // intrinsics scale with it exactly -- f/width is invariant, which is the
+  // property P3-T2 tests to 1e-16 -- so this is free and adds real wallpaper
+  // detail even when the photo itself has none to give.
+  superScale = Math.min(3, window.devicePixelRatio || 1) *
+               Math.max(1, (cv.clientWidth || scene.image.width) / scene.image.width);
+  superScale = Math.min(superScale, 4096 / scene.image.width, 3);
+  cv.width  = Math.round(scene.image.width  * superScale);
+  cv.height = Math.round(scene.image.height * superScale);
+  tex2d(photo,0,true); tex2d(maps,1,false); tex2d(shade,3,true);
+  gl.uniform1i(U('uPhoto'),0); gl.uniform1i(U('uMaps'),1);
+  gl.uniform1i(U('uTex'),2);   gl.uniform1i(U('uShade'),3);
+
+  const P = scene.planes;
+  for(let i=0;i<P.length && i<24;i++){
+    gl.uniform3fv(U(`uN[${i}]`), P[i].normal);
+    gl.uniform1f (U(`uD[${i}]`), P[i].d);
+    gl.uniform3fv(U(`uU[${i}]`), P[i].u_axis);
+    gl.uniform3fv(U(`uV[${i}]`), P[i].v_axis);
+    gl.uniform3fv(U(`uO[${i}]`), P[i].origin);
+  }
+  const idx = {}; P.forEach((p,i)=>idx[p.id]=i);
+  regionLayer = new Array(64).fill(-1);
+  regionAsset = new Array(64).fill(null);
+  scene.regions.forEach(r=>{
+    gl.uniform1i(U(`uRegPlane[${r.id}]`), idx[r.plane] ?? 0);
+  });
+  gl.uniform1f(U('uShScale'), (scene.shading && scene.shading.scale) || 1.6);
+
+  document.getElementById('np').textContent = P.length;
+  document.getElementById('nr').textContent = scene.regions.length;
+  document.getElementById('fw').textContent = (scene.camera.f_px/scene.image.width).toFixed(2);
+  document.getElementById('dim').textContent = `${scene.image.width}×${scene.image.height}`;
+
+  const q = scene.quality || {};
+  document.getElementById('quality').innerHTML = [
+    ['ceiling height', q.vertical_extent_m!=null ? q.vertical_extent_m.toFixed(2)+' m' : '–'],
+    ['wall coverage', q.wall_coverage!=null ? (100*q.wall_coverage).toFixed(1)+'%' : '–'],
+    ['gravity tilt', q.gravity_tilt_deg!=null ? q.gravity_tilt_deg.toFixed(1)+'°' : '–'],
+    ['non-Manhattan (major)', q.non_manhattan_major_pairs ?? '–'],
+  ].map(([k,v])=>`<div class="stat"><span>${k}</span><b>${v}</b></div>`).join('');
+
+  buildRegionList();
+  if(regionAsset.every(x=>x===null) && filtered.length) applyAsset(filtered[0]);
+  draw();
+}
+
+function buildRegionList(){
+  const box = document.getElementById('regions');
+  const pal = ['#3b82f6','#f59e0b','#10b981','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316'];
+  const sel = document.getElementById('target');
+  sel.innerHTML = '<option value="all">all walls</option>';
+  box.innerHTML = scene.regions.map(r=>{
+    const p = scene.planes.find(p=>p.id===r.plane) || {};
+    sel.innerHTML += `<option value="${r.id}">${p.suggested_label||'wall'} · region ${r.id}</option>`;
+    return `<div class="rgn" data-r="${r.id}">
+      <span class="dot" style="background:${pal[r.plane%pal.length]}"></span>
+      <span style="flex:1">${p.suggested_label||'wall'} · r${r.id}</span>
+      <span style="opacity:.6">${r.area_m2 ? r.area_m2.toFixed(1)+' m²' : ''}</span></div>`;
+  }).join('');
+  box.querySelectorAll('.rgn').forEach(el=>{
+    el.onmouseenter = ()=>{ hi = +el.dataset.r; draw(); };
+    el.onmouseleave = ()=>{ hi = -1; draw(); };
+    el.onclick = ()=>{ target = el.dataset.r; sel.value = target; };
+  });
+  sel.onchange = e => target = e.target.value;
+}
+
+const srcInfo = {};
+async function applyAsset(a){
+  let layer = layerOf[a.id];
+  if(layer === undefined){
+    layer = Object.keys(layerOf).length % MAXLAYERS;
+    const { img, src } = await loadTextureImage(a);
+    uploadLayer(img, layer);
+    layerOf[a.id] = layer;
+    srcInfo[a.id] = `${src} ${img.naturalWidth}×${img.naturalHeight}`;
+  }
+  const w = (a.scale && a.scale > 0.05) ? a.scale : 0.53;
+  const off = a.repeatType === 'offset' ? 1.0 : 0.0;
+  const ids = target === 'all' ? scene.regions.map(r=>r.id) : [ +target ];
+  ids.forEach(id=>{
+    regionLayer[id] = layer; regionAsset[id] = a;
+    gl.uniform1i(U(`uRegLayer[${id}]`), layer);
+    gl.uniform1f(U(`uRegW[${id}]`), w);
+    gl.uniform1f(U(`uRegOff[${id}]`), off);
+  });
+  const info = srcInfo[a.id] || '';
+  const ok = info.startsWith('cloud');
+  document.getElementById('meta').innerHTML =
+    `<b>${a.brand} · ${a.collection}</b><br>sku ${a.sku} — ${w.toFixed(2)} m repeat, ${a.repeatType}` +
+    `<br><span style="color:${ok?'#0a7':'#c33'}">source: ${info}` +
+    (ok ? '' : ' — CORS still blocked, using low-res fallback') + `</span>`;
+  draw();
+}
+
+let acc=[];
+function draw(){
+  if(!scene) return;
+  const t0 = performance.now();
+  gl.viewport(0,0,cv.width,cv.height);
+  gl.uniform2f(U('uRes'), cv.width, cv.height);
+  gl.uniform1f(U('uF'),  scene.camera.f_px * superScale);
+  gl.uniform1f(U('uCx'), scene.camera.cx   * superScale);
+  gl.uniform1f(U('uCy'), scene.camera.cy   * superScale);
+  gl.uniform1i(U('uHi'), hi);
+  gl.drawArrays(gl.TRIANGLES,0,3);
+  gl.finish();
+  acc.push(performance.now()-t0); if(acc.length>10) acc.shift();
+  document.getElementById('ms').textContent =
+    (acc.reduce((a,b)=>a+b,0)/acc.length).toFixed(1)+' ms';
+}
+
+function renderSwatches(){
+  const box = document.getElementById('swatches');
+  box.innerHTML = filtered.slice(0,120).map((a,i)=>
+    `<div class="sw" data-i="${i}" title="${a.collection} ${a.sku}"
+      style="background-image:url('${a.placeholder}')"></div>`).join('');
+  box.querySelectorAll('.sw').forEach(el=>{
+    el.onclick = ()=>{
+      box.querySelectorAll('.sw').forEach(s=>s.classList.remove('on'));
+      el.classList.add('on');
+      applyAsset(filtered[+el.dataset.i]);
+    };
+  });
+}
+
+async function boot(){
+  const ss = document.getElementById('sample');
+  ss.innerHTML = SAMPLES.map(s=>`<option>${s}</option>`).join('');
+  ss.onchange = e => loadSample(e.target.value);
+
+  try { assets = await (await fetch('../../textureAssets.json')).json(); }
+  catch(e){ err("Couldn't load textureAssets.json — is the server rooted at the repo?"); return; }
+
+  const colls = [...new Set(assets.map(a=>a.collection))].sort();
+  const cs = document.getElementById('coll');
+  cs.innerHTML = `<option value="">all (${assets.length})</option>` +
+    colls.map(c=>`<option>${c}</option>`).join('');
+  cs.onchange = e => { filtered = e.target.value ? assets.filter(a=>a.collection===e.target.value) : assets;
+                       renderSwatches(); };
+  filtered = assets;
+  initTexArray();
+  renderSwatches();
+  await loadSample(SAMPLES[0]);
+}
+boot();
+</script>
